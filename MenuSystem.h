@@ -31,6 +31,9 @@ private:
     std::string inputPort;
     bool focusAddress;
 
+    // Method to launch a separate host process
+    void launchHostProcess();
+
 public:
     MenuSystem(sf::RenderWindow& window, sf::Font& font);
 

@@ -1,6 +1,7 @@
 // MenuSystem.cpp
 #include "MenuSystem.h"
 #include <iostream>
+#include <windows.h> // Added for Windows process creation
 
 MenuSystem::MenuSystem(sf::RenderWindow& window, sf::Font& font)
     : window(window),
@@ -31,7 +32,10 @@ MenuSystem::MenuSystem(sf::RenderWindow& window, sf::Font& font)
         sf::Vector2f(200.f, 50.f),
         "Host",
         font,
-        [this]() { currentState = MenuGameState::MULTIPLAYER_HOST; }
+        [this]() { 
+            launchHostProcess();
+            // Don't change state since we're closing the window 
+        }
     ));
 
     menuButtons.push_back(Button(
@@ -58,6 +62,46 @@ MenuSystem::MenuSystem(sf::RenderWindow& window, sf::Font& font)
         font,
         [this]() { currentState = MenuGameState::MENU; }
     ));
+}
+void MenuSystem::launchHostProcess() {
+    // Get the path to the current executable
+    char buffer[MAX_PATH];
+    GetModuleFileNameA(NULL, buffer, MAX_PATH);
+    std::string exePath = buffer;
+
+    // Replace all backslashes with forward slashes to avoid escaping issues
+    for (size_t i = 0; i < exePath.length(); ++i) {
+        if (exePath[i] == '\\') {
+            exePath[i] = '/';
+        }
+    }
+
+    // Prepare the command line
+    std::string cmdLine = "\"" + exePath + "\" --host 5000";
+
+    std::cout << "Launching host with command: " << cmdLine << std::endl;
+
+    // Use Windows API to launch the process
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+
+    // Start the process
+    if (CreateProcessA(NULL, const_cast<LPSTR>(cmdLine.c_str()), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+        // Close process and thread handles
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+
+        // Close the current window
+        window.close();
+    }
+    else {
+        // Process creation failed
+        std::cerr << "Failed to start host process. Error: " << GetLastError() << std::endl;
+    }
 }
 
 MenuGameState MenuSystem::run()
@@ -100,7 +144,7 @@ void MenuSystem::handleEvents()
                 }
                 else if (keyEvent->code == sf::Keyboard::Key::H && currentState == MenuGameState::MENU)
                 {
-                    currentState = MenuGameState::MULTIPLAYER_HOST;
+                    launchHostProcess();
                 }
                 else if (keyEvent->code == sf::Keyboard::Key::J && currentState == MenuGameState::MENU)
                 {

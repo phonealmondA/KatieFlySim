@@ -22,6 +22,10 @@
 #pragma comment(lib, "sfml-network.lib")
 #endif
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 // Parse command line arguments for multiplayer setup
 bool parseCommandLine(int argc, char* argv[], bool& isMultiplayer, bool& isHost,
     std::string& address, unsigned short& port) {
@@ -52,6 +56,7 @@ bool parseCommandLine(int argc, char* argv[], bool& isMultiplayer, bool& isHost,
     return false;
 }
 
+
 int main(int argc, char* argv[])
 {
     // Initialize SFML window
@@ -63,21 +68,28 @@ int main(int argc, char* argv[])
 
     // Try to load from common locations based on platform
 #ifdef _WIN32
-    if (font.openFromFile("arial.ttf") ||
+    // Get the Windows directory path
+    char winDirPath[MAX_PATH];
+    GetWindowsDirectoryA(winDirPath, MAX_PATH);
+    std::string fontPath = std::string(winDirPath) + "\\Fonts\\arial.ttf";
+
+    // Try Windows font directory first, then fall back to other locations
+    if (font.openFromFile(fontPath) ||
         font.openFromFile("C:/Windows/Fonts/arial.ttf") ||
-        font.openFromFile("C:/Windows/Fonts/Arial.ttf")) {
+        font.openFromFile("C:/Windows/Fonts/Arial.ttf") ||
+        font.openFromFile("arial.ttf")) {
         fontLoaded = true;
     }
 #elif defined(__APPLE__)
-    if (font.openFromFile("arial.ttf") ||
-        font.openFromFile("/Library/Fonts/Arial.ttf") ||
-        font.openFromFile("/System/Library/Fonts/Arial.ttf")) {
+    if (font.openFromFile("/Library/Fonts/Arial.ttf") ||
+        font.openFromFile("/System/Library/Fonts/Arial.ttf") ||
+        font.openFromFile("arial.ttf")) {
         fontLoaded = true;
     }
 #elif defined(__linux__)
-    if (font.openFromFile("arial.ttf") ||
-        font.openFromFile("/usr/share/fonts/truetype/msttcorefonts/Arial.ttf") ||
-        font.openFromFile("/usr/share/fonts/TTF/arial.ttf")) {
+    if (font.openFromFile("/usr/share/fonts/truetype/msttcorefonts/Arial.ttf") ||
+        font.openFromFile("/usr/share/fonts/TTF/arial.ttf") ||
+        font.openFromFile("arial.ttf")) {
         fontLoaded = true;
     }
 #else
@@ -93,37 +105,55 @@ int main(int argc, char* argv[])
     bool isHost = false;
     std::string address = "";
     unsigned short port = 5000;
-    parseCommandLine(argc, argv, isMultiplayer, isHost, address, port);
+    bool skipMenu = parseCommandLine(argc, argv, isMultiplayer, isHost, address, port);
 
-    // Initialize menu system
-    MenuSystem menuSystem(window, font);
+    // Variable to store the game state
+    MenuGameState currentState;
 
-    // Run menu and get the selected game state
-    MenuGameState currentState = menuSystem.run();
+    // Only show menu if not started with command line arguments
+    if (!skipMenu) {
+        // Initialize menu system
+        MenuSystem menuSystem(window, font);
 
-    // If the window was closed during menu, exit
-    if (!window.isOpen()) {
-        return 0;
-    }
+        // Run menu and get the selected game state
+        currentState = menuSystem.run();
 
-    // Handle state transitions from menu
-    if (currentState == MenuGameState::SINGLE_PLAYER) {
-        isMultiplayer = false;
-    }
-    else if (currentState == MenuGameState::MULTIPLAYER_HOST) {
-        isMultiplayer = true;
-        isHost = true;
-        port = 5000; // Default port for host
-    }
-    else if (currentState == MenuGameState::MULTIPLAYER_CLIENT) {
-        isMultiplayer = true;
-        isHost = false;
-        address = menuSystem.getServerAddress();
-        port = menuSystem.getServerPort();
+        // If the window was closed during menu, exit
+        if (!window.isOpen()) {
+            return 0;
+        }
+
+        // Handle state transitions from menu
+        if (currentState == MenuGameState::SINGLE_PLAYER) {
+            isMultiplayer = false;
+        }
+        else if (currentState == MenuGameState::MULTIPLAYER_HOST) {
+            isMultiplayer = true;
+            isHost = true;
+            port = 5000; // Default port for host
+        }
+        else if (currentState == MenuGameState::MULTIPLAYER_CLIENT) {
+            isMultiplayer = true;
+            isHost = false;
+            address = menuSystem.getServerAddress();
+            port = menuSystem.getServerPort();
+        }
+        else {
+            // Window was closed or invalid state
+            return 0;
+        }
     }
     else {
-        // Window was closed or invalid state
-        return 0;
+        // Set game state based on command line arguments
+        if (isMultiplayer && isHost) {
+            currentState = MenuGameState::MULTIPLAYER_HOST;
+        }
+        else if (isMultiplayer && !isHost) {
+            currentState = MenuGameState::MULTIPLAYER_CLIENT;
+        }
+        else {
+            currentState = MenuGameState::SINGLE_PLAYER;
+        }
     }
 
     // Update window title based on game mode
