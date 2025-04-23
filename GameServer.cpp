@@ -169,54 +169,64 @@ void GameServer::handlePlayerInput(int playerId, const PlayerInput& input) {
     }
 }
 
+
 GameState GameServer::getGameState() const {
     GameState state;
     state.sequenceNumber = sequenceNumber;
     state.timestamp = gameTime;
 
-    // Add all rockets
-    for (const auto& pair : players) {
-        int playerId = pair.first;
-        const VehicleManager* manager = pair.second;
+    try {
+        // Add all rockets
+        for (const auto& pair : players) {
+            int playerId = pair.first;
+            const VehicleManager* manager = pair.second;
 
-        // Add null checks
-        if (!manager) continue;
+            // Add null checks
+            if (!manager) continue;
 
-        // Only add if it's a rocket
-        if (manager->getActiveVehicleType() == VehicleType::ROCKET) {
-            const Rocket* rocket = manager->getRocket();
+            // Only add if it's a rocket
+            if (manager->getActiveVehicleType() == VehicleType::ROCKET) {
+                const Rocket* rocket = manager->getRocket();
 
-            // Add null check for rocket
-            if (!rocket) continue;
+                // Add null check for rocket
+                if (!rocket) continue;
 
-            RocketState rocketState;
-            rocketState.playerId = playerId;
-            rocketState.position = rocket->getPosition();
-            rocketState.velocity = rocket->getVelocity();
-            rocketState.rotation = rocket->getRotation();
-            rocketState.angularVelocity = 0.0f; // Not tracked in your current design
-            rocketState.thrustLevel = rocket->getThrustLevel();
-            rocketState.mass = rocket->getMass();
-            rocketState.color = rocket->getColor();
+                RocketState rocketState;
+                rocketState.playerId = playerId;
+                rocketState.position = rocket->getPosition();
+                rocketState.velocity = rocket->getVelocity();
+                rocketState.rotation = rocket->getRotation();
+                rocketState.angularVelocity = 0.0f; // Not tracked in your current design
+                rocketState.thrustLevel = rocket->getThrustLevel();
+                rocketState.mass = rocket->getMass();
+                rocketState.color = rocket->getColor();
 
-            state.rockets.push_back(rocketState);
+                state.rockets.push_back(rocketState);
+            }
+            // TODO: Add car state if needed
         }
-        // TODO: Add car state if needed
+
+        // Add all planets
+        for (size_t i = 0; i < planets.size(); ++i) {
+            const Planet* planet = planets[i];
+
+            // Skip null planets
+            if (!planet) continue;
+
+            PlanetState planetState;
+            planetState.planetId = static_cast<int>(i);
+            planetState.position = planet->getPosition();
+            planetState.velocity = planet->getVelocity();
+            planetState.mass = planet->getMass();
+            planetState.radius = planet->getRadius();
+            planetState.color = planet->getColor();
+
+            state.planets.push_back(planetState);
+        }
     }
-
-    // Add all planets
-    for (size_t i = 0; i < planets.size(); ++i) {
-        const Planet* planet = planets[i];
-
-        PlanetState planetState;
-        planetState.planetId = static_cast<int>(i);
-        planetState.position = planet->getPosition();
-        planetState.velocity = planet->getVelocity();
-        planetState.mass = planet->getMass();
-        planetState.radius = planet->getRadius();
-        planetState.color = planet->getColor();
-
-        state.planets.push_back(planetState);
+    catch (const std::exception& e) {
+        std::cerr << "Exception in getGameState: " << e.what() << std::endl;
+        // Return a minimal valid state to avoid crashes
     }
 
     return state;

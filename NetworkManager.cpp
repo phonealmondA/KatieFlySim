@@ -138,6 +138,7 @@ void NetworkManager::enableRobustNetworking() {
     }
 }
 
+
 void NetworkManager::update() {
     if (!connected) return;
 
@@ -191,10 +192,20 @@ void NetworkManager::update() {
             newClient->send(idPacket);
 
             // Create a new player for this client
-            if (gameServer) {
-                sf::Vector2f spawnPos = gameServer->getPlanets()[0]->getPosition() +
-                    sf::Vector2f(0, -(gameServer->getPlanets()[0]->getRadius() + GameConstants::ROCKET_SIZE + 30.0f));
-                gameServer->addPlayer(clientId, spawnPos, sf::Color::Red);
+            if (gameServer && !gameServer->getPlanets().empty()) {
+                // Guard against empty planets vector
+                const auto& planets = gameServer->getPlanets();
+
+                // Make sure we have at least one planet
+                if (!planets.empty() && planets[0] != nullptr) {
+                    sf::Vector2f spawnPos = planets[0]->getPosition() +
+                        sf::Vector2f(0, -(planets[0]->getRadius() + GameConstants::ROCKET_SIZE + 30.0f));
+                    gameServer->addPlayer(clientId, spawnPos, sf::Color::Red);
+                }
+                else {
+                    // Fallback to a default position if planets vector is empty
+                    gameServer->addPlayer(clientId, sf::Vector2f(400.f, 100.f), sf::Color::Red);
+                }
             }
 
             std::cout << "New client connected with ID: " << clientId << std::endl;
@@ -219,7 +230,7 @@ void NetworkManager::update() {
                     PlayerInput input;
                     packet >> input;
 
-                    if (onPlayerInputReceived) {
+                    if (onPlayerInputReceived && gameServer) {
                         // Debug output
                         std::cout << "Server received input from player ID: " << input.playerId
                             << " W/Up:" << input.thrustForward
@@ -270,8 +281,13 @@ void NetworkManager::update() {
             updateClock.restart();
 
             if (gameServer) {
-                GameState state = gameServer->getGameState();
-                sendGameState(state);
+                try {
+                    GameState state = gameServer->getGameState();
+                    sendGameState(state);
+                }
+                catch (const std::exception& e) {
+                    std::cerr << "Exception sending game state: " << e.what() << std::endl;
+                }
             }
         }
     }
@@ -303,7 +319,7 @@ void NetworkManager::update() {
                 GameState state;
                 packet >> state;
 
-                if (onGameStateReceived) {
+                if (onGameStateReceived && gameClient) {
                     onGameStateReceived(state);
                 }
             }
@@ -322,6 +338,7 @@ void NetworkManager::update() {
         }
     }
 }
+
 
 bool NetworkManager::sendGameState(const GameState& state) {
     if (!isHost || !connected) return false;

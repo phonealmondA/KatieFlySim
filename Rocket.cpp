@@ -26,19 +26,18 @@ Rocket::Rocket(sf::Vector2f pos, sf::Vector2f vel, sf::Color col, float m)
     }
 }
 
+
 void Rocket::setNearbyPlanets(const std::vector<Planet*>& planets) {
     // Check if input is empty first
     if (planets.empty()) {
         nearbyPlanets.clear();
         return;
     }
-
     try {
         // Clear existing planets first
         nearbyPlanets.clear();
-
         // Only add non-null planets
-        for (const auto* planet : planets) {
+        for (auto* planet : planets) {  // Changed from 'const auto*' to 'auto*'
             if (planet) {
                 nearbyPlanets.push_back(planet);
             }
