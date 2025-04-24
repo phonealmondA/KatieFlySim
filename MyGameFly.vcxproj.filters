@@ -149,5 +149,8 @@
     <ClInclude Include="OrbitalMechanics.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="psudo.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -179,6 +179,7 @@
     <ClInclude Include="NetworkWrapper.h" />
     <ClInclude Include="OrbitalMechanics.h" />
     <ClInclude Include="PlayerInput.h" />
+    <ClInclude Include="psudo.h" />
     <ClInclude Include="TextPanel.h" />
     <ClInclude Include="UIManager.h" />
     <ClInclude Include="VectorHelper.h" />

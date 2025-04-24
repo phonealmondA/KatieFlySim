@@ -27,14 +27,17 @@ MenuSystem::MenuSystem(sf::RenderWindow& window, sf::Font& font)
         [this]() { currentState = MenuGameState::SINGLE_PLAYER; }
     ));
 
+    // In MenuSystem.cpp, modify the button initialization in the constructor:
+
     menuButtons.push_back(Button(
         sf::Vector2f(640.f - 100.f, 370.f),
         sf::Vector2f(200.f, 50.f),
         "Host",
         font,
-        [this]() { 
+        [this, &window]() {
             launchHostProcess();
-            // Don't change state since we're closing the window 
+            // The window should close after launching the host process
+            window.close();
         }
     ));
 
