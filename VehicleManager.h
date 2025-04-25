@@ -39,4 +39,7 @@ public:
 
     GameObject* getActiveVehicle();
     VehicleType getActiveVehicleType() const { return activeVehicle; }
+
+    // Add method to update planet references
+    void updatePlanets(const std::vector<Planet*>& newPlanets);
 };

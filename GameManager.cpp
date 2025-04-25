@@ -60,14 +60,18 @@ void GameManager::initialize()
     gravitySimulator.addVehicleManager(activeVehicleManager);
 }
 
+
 void GameManager::update(float deltaTime)
 {
-    // Update simulation
+    // Update simulation - this may remove planets through collision detection
     gravitySimulator.update(deltaTime);
 
-    // Update planets
+    // Refresh the planets list from the simulator to avoid accessing deleted planets
+    planets = gravitySimulator.getPlanets();
+
+    // Now update the remaining valid planets
     for (auto* planet : planets) {
-        if (planet) { // Add null check
+        if (planet) { // Null check still good to have
             planet->update(deltaTime);
         }
     }
@@ -78,6 +82,9 @@ void GameManager::update(float deltaTime)
     // Handle camera/zoom
     updateCamera(deltaTime);
 }
+
+
+
 
 void GameManager::updateCamera(float deltaTime)
 {

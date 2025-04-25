@@ -226,3 +226,23 @@ GameObject* VehicleManager::getActiveVehicle() {
         return car ? car.get() : nullptr;
     }
 }
+
+void VehicleManager::updatePlanets(const std::vector<Planet*>& newPlanets) {
+    // Update the internal planets vector with the new set of planets
+    planets.clear();
+    for (auto* planet : newPlanets) {
+        if (planet) {
+            planets.push_back(planet);
+        }
+    }
+
+    // Update the planet references in rocket
+    if (rocket) {
+        rocket->setNearbyPlanets(planets);
+    }
+
+    // Update in car if needed
+    if (car) {
+        car->checkGrounding(planets);
+    }
+}

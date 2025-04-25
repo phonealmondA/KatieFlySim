@@ -17,6 +17,20 @@ void GravitySimulator::clearRockets()
     rockets.clear();
 }
 
+
+void GravitySimulator::updateVehicleManagerPlanets() {
+    if (!vehicleManager) return;
+
+    try {
+        vehicleManager->updatePlanets(planets);
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Exception in updateVehicleManagerPlanets: " << e.what() << std::endl;
+    }
+}
+
+
+
 void GravitySimulator::addRocketGravityInteractions(float deltaTime)
 {
     // Apply gravity between rockets
@@ -48,92 +62,140 @@ void GravitySimulator::addRocketGravityInteractions(float deltaTime)
 }
 
 
+
 void GravitySimulator::checkPlanetCollisions() {
     if (planets.size() < 2) return;
 
     std::vector<Planet*> planetsToKeep;
     std::vector<Planet*> planetsToDelete;
+    std::vector<bool> markedForDeletion(planets.size(), false);
 
-    // First pass: identify small planets to remove
+    // First pass: identify small planets to remove and do null checks
     for (size_t i = 0; i < planets.size(); i++) {
         Planet* planet = planets[i];
-        if (!planet) continue;
+        if (!planet) {
+            // Mark null planets for deletion
+            markedForDeletion[i] = true;
+            continue;
+        }
 
         // Check if the planet's mass is below threshold
         if (planet->getMass() < 10.0f) {
             planetsToDelete.push_back(planet);
-            planets[i] = nullptr; // Mark for deletion
+            markedForDeletion[i] = true;
+            planets[i] = nullptr; // Explicitly set to nullptr to prevent further access
         }
     }
 
-    // Second pass: check for collisions
+    // Second pass: check for collisions between non-deleted planets
     for (size_t i = 0; i < planets.size(); i++) {
+        if (markedForDeletion[i]) continue; // Skip already marked planets
+
         Planet* planet1 = planets[i];
-        if (!planet1) continue; // Skip already marked planets
+        if (!planet1) continue; // Extra safety check
 
         for (size_t j = i + 1; j < planets.size(); j++) {
-            Planet* planet2 = planets[j];
-            if (!planet2) continue; // Skip already marked planets
+            if (markedForDeletion[j]) continue; // Skip already marked planets
 
-            sf::Vector2f direction = planet2->getPosition() - planet1->getPosition();
+            Planet* planet2 = planets[j];
+            if (!planet2) continue; // Extra safety check
+
+            // Calculate distance safely
+            sf::Vector2f direction;
+            try {
+                direction = planet2->getPosition() - planet1->getPosition();
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception calculating planet distance: " << e.what() << std::endl;
+                continue; // Skip this pair if an exception occurs
+            }
+
             float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y);
 
             // Check for collision
             if (distance <= planet1->getRadius() + planet2->getRadius()) {
-                // Determine which planet is larger
-                if (planet1->getMass() >= planet2->getMass()) {
-                    // Planet 1 absorbs planet 2
-                    float newMass = planet1->getMass() + planet2->getMass();
+                try {
+                    // Determine which planet is larger
+                    if (planet1->getMass() >= planet2->getMass()) {
+                        // Planet 1 absorbs planet 2
+                        float newMass = planet1->getMass() + (planet2->getMass());
 
-                    // Conservation of momentum for velocity
-                    sf::Vector2f newVelocity = (planet1->getVelocity() * planet1->getMass() +
-                        planet2->getVelocity() * planet2->getMass()) / newMass;
+                        // Conservation of momentum for velocity
+                        sf::Vector2f newVelocity = (planet1->getVelocity() * planet1->getMass() +
+                            planet2->getVelocity() * planet2->getMass()) / newMass;
 
-                    // Update planet 1
-                    planet1->setMass(newMass);
-                    planet1->setVelocity(newVelocity);
+                        // Update planet 1
+                        planet1->setMass(newMass);
+                        planet1->setVelocity(newVelocity);
 
-                    // Mark planet 2 for deletion
-                    planetsToDelete.push_back(planet2);
-                    planets[j] = nullptr;
+                        // Mark planet 2 for deletion
+                        if (!markedForDeletion[j]) {
+                            planetsToDelete.push_back(planet2);
+                            markedForDeletion[j] = true;
+                            planets[j] = nullptr; // Explicitly set to nullptr
+                        }
+                    }
+                    else {
+                        // Planet 2 absorbs planet 1
+                        float newMass = planet1->getMass() + planet2->getMass();
+
+                        // Conservation of momentum for velocity
+                        sf::Vector2f newVelocity = (planet1->getVelocity() * planet1->getMass() +
+                            planet2->getVelocity() * planet2->getMass()) / newMass;
+
+                        // Update planet 2
+                        planet2->setMass(newMass);
+                        planet2->setVelocity(newVelocity);
+
+                        // Mark planet 1 for deletion
+                        if (!markedForDeletion[i]) {
+                            planetsToDelete.push_back(planet1);
+                            markedForDeletion[i] = true;
+                            planets[i] = nullptr; // Explicitly set to nullptr
+                        }
+                        break; // Exit inner loop since planet 1 is gone
+                    }
                 }
-                else {
-                    // Planet 2 absorbs planet 1
-                    float newMass = planet1->getMass() + planet2->getMass();
-
-                    // Conservation of momentum for velocity
-                    sf::Vector2f newVelocity = (planet1->getVelocity() * planet1->getMass() +
-                        planet2->getVelocity() * planet2->getMass()) / newMass;
-
-                    // Update planet 2
-                    planet2->setMass(newMass);
-                    planet2->setVelocity(newVelocity);
-
-                    // Mark planet 1 for deletion
-                    planetsToDelete.push_back(planet1);
-                    planets[i] = nullptr;
-                    break; // Exit inner loop since planet 1 is gone
+                catch (const std::exception& e) {
+                    std::cerr << "Exception during planet collision: " << e.what() << std::endl;
+                    continue; // Skip this pair if an exception occurs
                 }
             }
         }
     }
 
-    // Rebuild the planets vector without the deleted planets
-    planetsToKeep.reserve(planets.size() - planetsToDelete.size());
-    for (Planet* planet : planets) {
-        if (planet) {
-            planetsToKeep.push_back(planet);
+    // Build the filtered list of planets to keep
+    for (size_t i = 0; i < planets.size(); i++) {
+        if (!markedForDeletion[i] && planets[i]) {
+            planetsToKeep.push_back(planets[i]);
         }
     }
 
-    // Delete the marked planets
+    // Delete the marked planets safely
     for (Planet* planet : planetsToDelete) {
-        delete planet;
+        if (planet) { // Extra safety check
+            try {
+                delete planet;
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception deleting planet: " << e.what() << std::endl;
+            }
+        }
     }
 
     // Replace the planets vector with the filtered list
     planets = planetsToKeep;
+
+    // Update planets in vehicle manager - use our method
+    try {
+        updateVehicleManagerPlanets();
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Exception updating vehicle manager planets: " << e.what() << std::endl;
+    }
 }
+
+
 
 
 void GravitySimulator::update(float deltaTime)

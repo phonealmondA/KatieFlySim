@@ -4,6 +4,8 @@
 #include "GameConstants.h"
 #include <cmath>
 #include <iostream>
+#include <cstdint>  // For uint8_t
+#include <cstdlib>  // For rand()
 
 Rocket::Rocket(sf::Vector2f pos, sf::Vector2f vel, sf::Color col, float m)
     : GameObject(pos, vel, col), rotation(0), angularVelocity(0),
@@ -33,6 +35,8 @@ Rocket::Rocket(sf::Vector2f pos, sf::Vector2f vel, sf::Color col, float m)
     }
 }
 
+
+
 void Rocket::updateStoredMassVisual() {
     // Size based on stored mass (with minimum size)
     float radius = std::max(5.0f, std::sqrt(storedMass) * 3.0f);
@@ -40,11 +44,15 @@ void Rocket::updateStoredMassVisual() {
     storedMassVisual.setOrigin(sf::Vector2f(radius, radius));
 
     // Position at the front of the rocket, distance adjusted by size
-    float offsetDistance = GameConstants::ROCKET_SIZE + radius * 1.2f;
+    float offsetDistance = GameConstants::ROCKET_SIZE + radius * 2.0f;
     float radians = rotation * 3.14159f / 180.0f;
-    sf::Vector2f offset(-std::sin(radians), std::cos(radians));
+    // In SFML, 0 degrees is right, 90 degrees is down
+    sf::Vector2f offset(std::sin(radians), -std::cos(radians));
     storedMassVisual.setPosition(position + offset * offsetDistance);
 }
+
+
+
 
 void Rocket::addStoredMass(float amount) {
     // Add to stored mass
@@ -73,7 +81,13 @@ Planet* Rocket::dropStoredMass() {
     sf::Vector2f planetPos = position + offset * (GameConstants::ROCKET_SIZE * 2.0f);
 
     // Create a new planet with the stored mass
-    Planet* newPlanet = new Planet(planetPos, 0, storedMass, sf::Color(100, 200, 255));
+    uint8_t r = 100 + (rand() % 156); // 100-255
+    uint8_t g = 100 + (rand() % 156); // 100-255
+    uint8_t b = 100 + (rand() % 156); // 100-255
+    sf::Color randomColor(r, g, b);
+
+    // Create a new planet with the stored mass and random color
+    Planet* newPlanet = new Planet(planetPos, 0, storedMass, randomColor);
 
     // Give it the rocket's velocity plus a small offset to prevent immediate collisions
     newPlanet->setVelocity(velocity + offset * 10.0f);

@@ -25,9 +25,11 @@ public:
     void clearRockets();
     void addRocketGravityInteractions(float deltaTime);
     void checkPlanetCollisions();
-
     const std::vector<Planet*>& getPlanets() const { return planets; }
     void setSimulatePlanetGravity(bool enable) { simulatePlanetGravity = enable; }
+
+    // Only declare the method, don't implement it here
+    void updateVehicleManagerPlanets();
 
     void removeVehicleManager(VehicleManager* manager) { if (vehicleManager == manager) { vehicleManager = nullptr; } }
 };
