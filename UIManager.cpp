@@ -87,8 +87,11 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
             }
         }
     )
+{
+    // Constructor body - can be empty
+}
 
-    void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*>& planets, float deltaTime)
+void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*>& planets, float deltaTime)
 {
     // Store the current vehicle manager
     activeVehicleManager = vehicleManager;
@@ -230,7 +233,7 @@ void UIManager::render()
         // Draw a highlight circle around the selected planet
         sf::CircleShape highlight;
         highlight.setRadius(selectedPlanet->getRadius() + 5.0f);  // Slightly larger than planet
-        highlight.setOrigin(highlight.getRadius(), highlight.getRadius());
+        highlight.setOrigin(sf::Vector2f(highlight.getRadius(), highlight.getRadius()));
         highlight.setPosition(selectedPlanet->getPosition());
         highlight.setFillColor(sf::Color::Transparent);
         highlight.setOutlineColor(sf::Color::Yellow);

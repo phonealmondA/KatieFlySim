@@ -5,6 +5,9 @@
 #include "GravitySimulator.h"
 #include "NetworkManager.h"
 
+// Forward declaration
+class UIManager;
+
 class GameManager {
 private:
     sf::RenderWindow& window;
@@ -22,7 +25,7 @@ private:
     UIManager* uiManager;  // Reference to UI manager
 
 public:
-    GameManager(sf::RenderWindow& window);
+    GameManager(sf::RenderWindow& window, UIManager* ui = nullptr);
     ~GameManager();
 
     void initialize();
@@ -31,8 +34,9 @@ public:
     void render();
     void handleEvents();
     void cleanup();
-
-    // Added these methods to fix compiler errors
+    // Add to GameManager.h public section:
+    void setUIManager(UIManager* ui) { uiManager = ui; }
+    // Getters
     VehicleManager* getActiveVehicleManager();
     const std::vector<Planet*>& getPlanets() const;
     sf::View& getGameView();

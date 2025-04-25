@@ -177,7 +177,9 @@ int main(int argc, char* argv[])
     }
 
     // Initialize game manager
-    GameManager gameManager(window, &uiManager);
+    GameManager gameManager(window);
+    UIManager uiManager(window, font, gameManager.getUIView(), isMultiplayer, isHost);
+    gameManager.setUIManager(&uiManager);
 
     // For multiplayer, we'll need to connect to the network components
     VehicleManager* activeVehicleManager = nullptr;
@@ -205,7 +207,7 @@ int main(int argc, char* argv[])
     }
 
     // Initialize UI manager
-    UIManager uiManager(window, font, gameManager.getUIView(), isMultiplayer, isHost);
+    //UIManager uiManager(window, font, gameManager.getUIView(), isMultiplayer, isHost);
 
     // Initialize input manager
     InputManager inputManager(isMultiplayer, isHost);

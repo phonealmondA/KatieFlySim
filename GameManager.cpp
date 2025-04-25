@@ -9,7 +9,7 @@
 #include <cmath>
 #include <limits>
 
-
+// In GameManager.cpp, update the constructor
 GameManager::GameManager(sf::RenderWindow& window, UIManager* ui)
     : window(window),
     gameView(sf::Vector2f(640.f, 360.f), sf::Vector2f(1280.f, 720.f)),
@@ -21,7 +21,6 @@ GameManager::GameManager(sf::RenderWindow& window, UIManager* ui)
     // Initialize clock
     clock.restart();
 }
-
 
 GameManager::~GameManager()
 {
@@ -306,11 +305,11 @@ void GameManager::handleEvents()
         targetZoom = 1.0f + (std::min(dist1, dist2) - (planets[0]->getRadius() + GameConstants::ROCKET_SIZE)) / 100.0f;
         gameView.setCenter(activeVehicleManager->getActiveVehicle()->getPosition());
     }
-    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::C)) {
+    //else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::C)) {
         // Follow planet 2
-        targetZoom = 10.0f;
-        gameView.setCenter(planets[1]->getPosition());
-    }
+     //   targetZoom = 10.0f;
+     //   gameView.setCenter(planets[1]->getPosition());
+    //}
 }
 
 void GameManager::cleanup()
