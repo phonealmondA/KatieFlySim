@@ -18,6 +18,7 @@ private:
     float thrustLevel; // Current thrust level (0.0 to 1.0)
     std::vector<Planet*> nearbyPlanets;
     float mass; // Added mass property for physics calculations
+    float storedMass; // Mass taken from planets that can be transferred back
 
     bool checkCollision(const Planet& planet);
 
@@ -39,6 +40,10 @@ public:
 
     // Add getter for mass
     float getMass() const { return mass; }
+
+    // Add storedMass methods
+    float getStoredMass() const { return storedMass; }
+    void addStoredMass(float amount);
 
     void update(float deltaTime) override;
     void draw(sf::RenderWindow& window) override;

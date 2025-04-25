@@ -6,7 +6,8 @@
 #include <iostream>
 
 Rocket::Rocket(sf::Vector2f pos, sf::Vector2f vel, sf::Color col, float m)
-    : GameObject(pos, vel, col), rotation(0), angularVelocity(0), thrustLevel(0.0f), mass(m)
+    : GameObject(pos, vel, col), rotation(0), angularVelocity(0),
+    thrustLevel(0.0f), mass(m), storedMass(0.0f)
 {
     try {
         // Create rocket body (a simple triangle)
@@ -26,6 +27,18 @@ Rocket::Rocket(sf::Vector2f pos, sf::Vector2f vel, sf::Color col, float m)
     }
 }
 
+void Rocket::addStoredMass(float amount) {
+    // Add to stored mass
+    storedMass += amount;
+
+    // Make sure stored mass doesn't go negative
+    if (storedMass < 0.0f) {
+        storedMass = 0.0f;
+    }
+
+    // Update total mass (base mass of 1.0 + stored mass)
+    mass = 1.0f + storedMass;
+}
 
 void Rocket::setNearbyPlanets(const std::vector<Planet*>& planets) {
     // Check if input is empty first

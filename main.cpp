@@ -217,7 +217,7 @@ int main(int argc, char* argv[])
     while (window.isOpen())
     {
         // Calculate delta time (limit to avoid physics issues)
-        float deltaTime = std::min(clock.restart().asSeconds(), 0.1f);
+        float deltaTime = clock.restart().asSeconds();
 
         // Update network if multiplayer
         if (isMultiplayer) {

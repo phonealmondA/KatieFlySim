@@ -13,12 +13,13 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
     isMultiplayer(multiplayer),
     isHost(host),
     nearestPlanet(nullptr),
+    activeVehicleManager(nullptr),
     // Initialize all objects in the initializer list
-    rocketInfoPanel(font, 14, sf::Vector2f(10, 10), sf::Vector2f(300, 100)),
-    planetInfoPanel(font, 14, sf::Vector2f(10, 120), sf::Vector2f(300, 120)),
-    orbitInfoPanel(font, 14, sf::Vector2f(10, 250), sf::Vector2f(300, 100)),
-    controlsPanel(font, 14, sf::Vector2f(10, 360), sf::Vector2f(300, 160)),
-    thrustMetricsPanel(font, 14, sf::Vector2f(10, 530), sf::Vector2f(300, 80)),
+    rocketInfoPanel(font, 14, sf::Vector2f(10, 10), sf::Vector2f(300, 150)),
+    planetInfoPanel(font, 14, sf::Vector2f(10, 170), sf::Vector2f(300, 120)),
+    orbitInfoPanel(font, 14, sf::Vector2f(10, 300), sf::Vector2f(300, 100)),
+    controlsPanel(font, 14, sf::Vector2f(10, 410), sf::Vector2f(300, 160)),
+    thrustMetricsPanel(font, 14, sf::Vector2f(10, 580), sf::Vector2f(300, 80)),
     multiplayerPanel(font, 14, sf::Vector2f(window.getSize().x - 310, 10), sf::Vector2f(300, 100)),
     increaseMassButton(
         sf::Vector2f(320, 120), // Position to the right of planetInfoPanel
@@ -26,9 +27,14 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
         "+",                    // Plus symbol
         font,
         [this]() {
-            if (nearestPlanet) {
-                float currentMass = nearestPlanet->getMass();
-                nearestPlanet->setMass(currentMass + 1.0f); // Increase by 00.1%
+            if (nearestPlanet && activeVehicleManager) {
+                Rocket* rocket = activeVehicleManager->getRocket();
+                if (rocket && rocket->getStoredMass() > 0.0f) {
+                    // Transfer 1 unit of mass from rocket to planet
+                    float massToTransfer = 0.1f;
+                    rocket->addStoredMass(-massToTransfer); // Remove from rocket
+                    nearestPlanet->setMass(nearestPlanet->getMass() + massToTransfer); // Add to planet
+                }
             }
         }
     ),
@@ -38,9 +44,14 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
         "-",                    // Minus symbol
         font,
         [this]() {
-            if (nearestPlanet) {
-                float currentMass = nearestPlanet->getMass();
-                nearestPlanet->setMass(currentMass - 1.0f); // Decrease by 10%
+            if (nearestPlanet && activeVehicleManager) {
+                Rocket* rocket = activeVehicleManager->getRocket();
+                if (rocket && nearestPlanet->getMass() > 1.0f) { // Don't let planet go below 1 mass
+                    // Transfer 1 unit of mass from planet to rocket
+                    float massToTransfer = 0.1f;
+                    nearestPlanet->setMass(nearestPlanet->getMass() - massToTransfer); // Remove from planet
+                    rocket->addStoredMass(massToTransfer); // Add to rocket
+                }
             }
         }
     )
@@ -74,6 +85,9 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
 
 void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*>& planets, float deltaTime)
 {
+    // Store the current vehicle manager
+    activeVehicleManager = vehicleManager;
+
     // Only update if we have a valid vehicle manager
     if (!vehicleManager) return;
 
@@ -163,7 +177,8 @@ void UIManager::updateRocketInfo(VehicleManager* vehicleManager)
         ss << "Speed: " << std::fixed << std::setprecision(1)
             << std::sqrt(rocket->getVelocity().x * rocket->getVelocity().x +
                 rocket->getVelocity().y * rocket->getVelocity().y) << "\n";
-        ss << "Mass: " << rocket->getMass() << std::endl; 
+        ss << "Mass: " << rocket->getMass() << std::endl;
+        ss << "Stored Mass: " << rocket->getStoredMass() << "\n";
         ss << "Thrust Level: " << std::fixed << std::setprecision(1)
             << rocket->getThrustLevel() * 100.0f << "%";
     }
@@ -238,7 +253,7 @@ void UIManager::updatePlanetInfo(VehicleManager* vehicleManager, const std::vect
         << (GameConstants::G * closestPlanet->getMass() /
             (closestPlanet->getRadius() * closestPlanet->getRadius())) << "\n";
     // Add the mass adjustment hint
-    ss << "Click +/- to adjust mass";
+    ss << "Click +/- to transfer mass";
     planetInfoPanel.setText(ss.str());
 }
 
@@ -304,8 +319,8 @@ void UIManager::updateThrustMetrics(VehicleManager* vehicleManager, const std::v
         }
     }
 
-    // Get current thrust level
-    float currentThrust = maxThrust * rocket->getThrustLevel();
+    // Get current thrust level moddddd
+    float currentThrust = 100 * rocket->getThrustLevel();
 
     // Calculate TWR (Thrust to Weight Ratio)
     float totalMass = rocket->getMass();

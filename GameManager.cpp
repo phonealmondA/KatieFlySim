@@ -227,6 +227,7 @@ void GameManager::handleEvents()
 
     // Handle thrust level setting
     float setThrustLevel = 1.0f;
+    float deltaTime = std::min(clock.restart().asSeconds(), 0.1f);
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Num1))
         activeVehicleManager->getRocket()->setThrustLevel(0.1f);
     else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Num2))
@@ -256,9 +257,9 @@ void GameManager::handleEvents()
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
         activeVehicleManager->applyThrust(-0.5f);
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
-        activeVehicleManager->rotate(-4.0f * clock.restart().asSeconds() * 60.0f);
+        activeVehicleManager->rotate(-4.0f * deltaTime * 60.0f);
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
-        activeVehicleManager->rotate(4.0f * clock.restart().asSeconds() * 60.0f);
+        activeVehicleManager->rotate(4.0f * deltaTime * 60.0f);
 
     // Camera control keys
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z)) {
