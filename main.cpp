@@ -60,7 +60,7 @@ bool parseCommandLine(int argc, char* argv[], bool& isMultiplayer, bool& isHost,
 int main(int argc, char* argv[])
 {
     // Initialize SFML window
-    sf::RenderWindow window(sf::VideoMode({ 1280, 720 }), "Noah's Flight Sim");
+    sf::RenderWindow window(sf::VideoMode({ 1280, 720 }), "Katie's Flight Sim");
 
     // Load font
     sf::Font font;
@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
     }
 
     // Update window title based on game mode
-    std::string windowTitle = "Noah's Space Program";
+    std::string windowTitle = "Katie's Space Program";
     if (isMultiplayer) {
         windowTitle += isHost ? " (Server)" : " (Client)";
     }

@@ -47,6 +47,95 @@ void GravitySimulator::addRocketGravityInteractions(float deltaTime)
     }
 }
 
+
+void GravitySimulator::checkPlanetCollisions() {
+    if (planets.size() < 2) return;
+
+    std::vector<Planet*> planetsToKeep;
+    std::vector<Planet*> planetsToDelete;
+
+    // First pass: identify small planets to remove
+    for (size_t i = 0; i < planets.size(); i++) {
+        Planet* planet = planets[i];
+        if (!planet) continue;
+
+        // Check if the planet's mass is below threshold
+        if (planet->getMass() < 10.0f) {
+            planetsToDelete.push_back(planet);
+            planets[i] = nullptr; // Mark for deletion
+        }
+    }
+
+    // Second pass: check for collisions
+    for (size_t i = 0; i < planets.size(); i++) {
+        Planet* planet1 = planets[i];
+        if (!planet1) continue; // Skip already marked planets
+
+        for (size_t j = i + 1; j < planets.size(); j++) {
+            Planet* planet2 = planets[j];
+            if (!planet2) continue; // Skip already marked planets
+
+            sf::Vector2f direction = planet2->getPosition() - planet1->getPosition();
+            float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+
+            // Check for collision
+            if (distance <= planet1->getRadius() + planet2->getRadius()) {
+                // Determine which planet is larger
+                if (planet1->getMass() >= planet2->getMass()) {
+                    // Planet 1 absorbs planet 2
+                    float newMass = planet1->getMass() + planet2->getMass();
+
+                    // Conservation of momentum for velocity
+                    sf::Vector2f newVelocity = (planet1->getVelocity() * planet1->getMass() +
+                        planet2->getVelocity() * planet2->getMass()) / newMass;
+
+                    // Update planet 1
+                    planet1->setMass(newMass);
+                    planet1->setVelocity(newVelocity);
+
+                    // Mark planet 2 for deletion
+                    planetsToDelete.push_back(planet2);
+                    planets[j] = nullptr;
+                }
+                else {
+                    // Planet 2 absorbs planet 1
+                    float newMass = planet1->getMass() + planet2->getMass();
+
+                    // Conservation of momentum for velocity
+                    sf::Vector2f newVelocity = (planet1->getVelocity() * planet1->getMass() +
+                        planet2->getVelocity() * planet2->getMass()) / newMass;
+
+                    // Update planet 2
+                    planet2->setMass(newMass);
+                    planet2->setVelocity(newVelocity);
+
+                    // Mark planet 1 for deletion
+                    planetsToDelete.push_back(planet1);
+                    planets[i] = nullptr;
+                    break; // Exit inner loop since planet 1 is gone
+                }
+            }
+        }
+    }
+
+    // Rebuild the planets vector without the deleted planets
+    planetsToKeep.reserve(planets.size() - planetsToDelete.size());
+    for (Planet* planet : planets) {
+        if (planet) {
+            planetsToKeep.push_back(planet);
+        }
+    }
+
+    // Delete the marked planets
+    for (Planet* planet : planetsToDelete) {
+        delete planet;
+    }
+
+    // Replace the planets vector with the filtered list
+    planets = planetsToKeep;
+}
+
+
 void GravitySimulator::update(float deltaTime)
 {
     // Apply gravity between planets if enabled
@@ -128,4 +217,7 @@ void GravitySimulator::update(float deltaTime)
         // Add rocket-to-rocket gravity interactions
         addRocketGravityInteractions(deltaTime);
     }
+
+    // Check for planet collisions and cleanup too-small planets
+    checkPlanetCollisions();
 }

@@ -20,7 +20,9 @@ private:
     float mass; // Added mass property for physics calculations
     float storedMass; // Mass taken from planets that can be transferred back
     float fuelConsumptionRate; // Mass consumed per second at full thrust
+    sf::CircleShape storedMassVisual; // Visual representation of stored mass
 
+    void updateStoredMassVisual();
     bool checkCollision(const Planet& planet);
 
 public:
@@ -45,6 +47,9 @@ public:
     // Add storedMass methods
     float getStoredMass() const { return storedMass; }
     void addStoredMass(float amount);
+
+    // New method to drop stored mass as a planet
+    Planet* dropStoredMass();
 
     // Fuel consumption methods
     void consumeFuel(float deltaTime);

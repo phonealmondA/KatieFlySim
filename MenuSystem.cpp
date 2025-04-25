@@ -13,7 +13,7 @@ MenuSystem::MenuSystem(sf::RenderWindow& window, sf::Font& font)
     focusAddress(true)
 {
     // Initialize title text
-    titleText.setString("Noah's Flight Sim");
+    titleText.setString("Katie's Flight Sim");
     titleText.setCharacterSize(48);
     titleText.setFillColor(sf::Color::White);
     titleText.setPosition(sf::Vector2f(640.f - titleText.getLocalBounds().size.x / 2, 150.f));

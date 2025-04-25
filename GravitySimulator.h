@@ -1,4 +1,4 @@
-// Update in GravitySimulator.h
+// GravitySimulator.h
 #pragma once
 #include "Planet.h"
 #include "Rocket.h"
@@ -24,9 +24,10 @@ public:
     void update(float deltaTime);
     void clearRockets();
     void addRocketGravityInteractions(float deltaTime);
+    void checkPlanetCollisions();
 
     const std::vector<Planet*>& getPlanets() const { return planets; }
     void setSimulatePlanetGravity(bool enable) { simulatePlanetGravity = enable; }
 
-    void removeVehicleManager(VehicleManager* manager) {if (vehicleManager == manager) {vehicleManager = nullptr; }}
+    void removeVehicleManager(VehicleManager* manager) { if (vehicleManager == manager) { vehicleManager = nullptr; } }
 };

@@ -22,10 +22,28 @@ Rocket::Rocket(sf::Vector2f pos, sf::Vector2f vel, sf::Color col, float m)
 
         // Add default engine
         addPart(std::make_unique<Engine>(sf::Vector2f(0, GameConstants::ROCKET_SIZE), GameConstants::ENGINE_THRUST_POWER));
+
+        // Initialize stored mass visual
+        storedMassVisual.setFillColor(sf::Color(100, 200, 255, 180)); // Light blue, semi-transparent
+        storedMassVisual.setOrigin(sf::Vector2f(0.0f, 0.0f));
+        updateStoredMassVisual();
     }
     catch (const std::exception& e) {
         std::cerr << "Exception in Rocket constructor: " << e.what() << std::endl;
     }
+}
+
+void Rocket::updateStoredMassVisual() {
+    // Size based on stored mass (with minimum size)
+    float radius = std::max(5.0f, std::sqrt(storedMass) * 3.0f);
+    storedMassVisual.setRadius(radius);
+    storedMassVisual.setOrigin(sf::Vector2f(radius, radius));
+
+    // Position at the front of the rocket, distance adjusted by size
+    float offsetDistance = GameConstants::ROCKET_SIZE + radius * 1.2f;
+    float radians = rotation * 3.14159f / 180.0f;
+    sf::Vector2f offset(-std::sin(radians), std::cos(radians));
+    storedMassVisual.setPosition(position + offset * offsetDistance);
 }
 
 void Rocket::addStoredMass(float amount) {
@@ -39,6 +57,33 @@ void Rocket::addStoredMass(float amount) {
 
     // Update total mass (base mass of 1.0 + stored mass)
     mass = 1.0f + storedMass;
+
+    // Update visual representation
+    updateStoredMassVisual();
+}
+
+Planet* Rocket::dropStoredMass() {
+    if (storedMass < 0.1f) {
+        return nullptr; // Not enough mass to drop
+    }
+
+    // Calculate position in front of the rocket
+    float radians = rotation * 3.14159f / 180.0f;
+    sf::Vector2f offset(-std::sin(radians), std::cos(radians));
+    sf::Vector2f planetPos = position + offset * (GameConstants::ROCKET_SIZE * 2.0f);
+
+    // Create a new planet with the stored mass
+    Planet* newPlanet = new Planet(planetPos, 0, storedMass, sf::Color(100, 200, 255));
+
+    // Give it the rocket's velocity
+    newPlanet->setVelocity(velocity);
+
+    // Reset stored mass
+    storedMass = 0.0f;
+    mass = 1.0f; // Base mass
+    updateStoredMassVisual();
+
+    return newPlanet;
 }
 
 void Rocket::consumeFuel(float deltaTime) {
@@ -60,6 +105,9 @@ void Rocket::consumeFuel(float deltaTime) {
         // Update stored mass and total mass
         storedMass -= consumedMass;
         mass = 1.0f + storedMass; // Base mass (1.0) + stored mass
+
+        // Update visual
+        updateStoredMassVisual();
     }
 
     // Store current thrust state for next frame
@@ -242,6 +290,9 @@ void Rocket::update(float deltaTime)
         // Update body position and rotation
         body.setPosition(position);
         body.setRotation(sf::degrees(rotation));
+
+        // Update the stored mass visual
+        updateStoredMassVisual();
     }
     catch (const std::exception& e) {
         std::cerr << "Exception in Rocket::update: " << e.what() << std::endl;
@@ -261,6 +312,11 @@ void Rocket::draw(sf::RenderWindow& window)
             if (part) {
                 part->draw(window, position, rotation, 1.0f, thrustLevel, hasFuel());
             }
+        }
+
+        // Draw stored mass visual if we have mass stored
+        if (storedMass > 0.01f) {
+            window.draw(storedMassVisual);
         }
     }
     catch (const std::exception& e) {
@@ -294,6 +350,15 @@ void Rocket::drawWithConstantSize(sf::RenderWindow& window, float zoomLevel)
             if (part) {
                 part->draw(window, position, rotation, scaleMultiplier, thrustLevel, hasFuel());
             }
+        }
+
+        // Draw stored mass visual if we have mass stored
+        if (storedMass > 0.01f) {
+            sf::CircleShape scaledVisual = storedMassVisual;
+            scaledVisual.setRadius(storedMassVisual.getRadius() * zoomLevel);
+            scaledVisual.setOrigin(sf::Vector2f(storedMassVisual.getRadius() * zoomLevel, storedMassVisual.getRadius() * zoomLevel));
+            scaledVisual.setPosition(storedMassVisual.getPosition());
+            window.draw(scaledVisual);
         }
     }
     catch (const std::exception& e) {

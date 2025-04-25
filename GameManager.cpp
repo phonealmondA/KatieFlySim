@@ -66,8 +66,10 @@ void GameManager::update(float deltaTime)
     gravitySimulator.update(deltaTime);
 
     // Update planets
-    for (auto planet : planets) {
-        planet->update(deltaTime);
+    for (auto* planet : planets) {
+        if (planet) { // Add null check
+            planet->update(deltaTime);
+        }
     }
 
     // Update active vehicle
@@ -193,28 +195,41 @@ void GameManager::handleEvents()
             }
         }
 
-        if (event->is<sf::Event::KeyPressed>())
-        {
+        // Modify in main.cpp - add to the event handling section where key presses are processed
+// (inside gameManager.handleEvents() or similar function)
+
+        if (event->is<sf::Event::KeyPressed>()) {
             const auto* keyEvent = event->getIf<sf::Event::KeyPressed>();
-            if (keyEvent)
-            {
+            if (keyEvent) {
                 if (keyEvent->code == sf::Keyboard::Key::Escape)
                     window.close();
-                else if (keyEvent->code == sf::Keyboard::Key::P)
-                {
+                else if (keyEvent->code == sf::Keyboard::Key::P) {
                     // Toggle planet gravity simulation
                     static bool planetGravity = true;
                     planetGravity = !planetGravity;
                     gravitySimulator.setSimulatePlanetGravity(planetGravity);
                 }
-                else if (keyEvent->code == sf::Keyboard::Key::L && !lKeyPressed)
-                {
+                else if (keyEvent->code == sf::Keyboard::Key::L && !lKeyPressed) {
                     lKeyPressed = true;
                     activeVehicleManager->switchVehicle();
                 }
+                // Add new key handler for dropping stored mass
+                else if (keyEvent->code == sf::Keyboard::Key::Hyphen) {
+                    if (activeVehicleManager &&
+                        activeVehicleManager->getActiveVehicleType() == VehicleType::ROCKET &&
+                        activeVehicleManager->getRocket()) {
+
+                        Planet* newPlanet = activeVehicleManager->getRocket()->dropStoredMass();
+                        if (newPlanet) {
+                            // Add the new planet to the simulation
+                            planets.push_back(newPlanet);
+                            gravitySimulator.addPlanet(newPlanet);
+                            std::cout << "Dropped mass and created new planet!" << std::endl;
+                        }
+                    }
+                }
             }
         }
-
         if (event->is<sf::Event::KeyReleased>())
         {
             const auto* keyEvent = event->getIf<sf::Event::KeyReleased>();
