@@ -24,6 +24,7 @@ private:
     Button increaseMassButton;
     Button decreaseMassButton;
     Planet* nearestPlanet;
+    VehicleManager* activeVehicleManager;
 
     bool isMultiplayer;
     bool isHost;
