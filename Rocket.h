@@ -19,6 +19,7 @@ private:
     std::vector<Planet*> nearbyPlanets;
     float mass; // Added mass property for physics calculations
     float storedMass; // Mass taken from planets that can be transferred back
+    float fuelConsumptionRate; // Mass consumed per second at full thrust
 
     bool checkCollision(const Planet& planet);
 
@@ -44,6 +45,10 @@ public:
     // Add storedMass methods
     float getStoredMass() const { return storedMass; }
     void addStoredMass(float amount);
+
+    // Fuel consumption methods
+    void consumeFuel(float deltaTime);
+    bool hasFuel() const;
 
     void update(float deltaTime) override;
     void draw(sf::RenderWindow& window) override;

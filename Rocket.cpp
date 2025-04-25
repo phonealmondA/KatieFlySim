@@ -7,7 +7,8 @@
 
 Rocket::Rocket(sf::Vector2f pos, sf::Vector2f vel, sf::Color col, float m)
     : GameObject(pos, vel, col), rotation(0), angularVelocity(0),
-    thrustLevel(0.0f), mass(m), storedMass(0.0f)
+    thrustLevel(0.0f), mass(m), storedMass(0.0f),
+    fuelConsumptionRate(GameConstants::BASE_FUEL_CONSUMPTION_RATE)
 {
     try {
         // Create rocket body (a simple triangle)
@@ -38,6 +39,35 @@ void Rocket::addStoredMass(float amount) {
 
     // Update total mass (base mass of 1.0 + stored mass)
     mass = 1.0f + storedMass;
+}
+
+void Rocket::consumeFuel(float deltaTime) {
+    // Only consume fuel if thrusting AND thrust is actually being applied
+    // This requires passing in an "isThrusting" parameter or tracking it in the Rocket class
+    static bool isThrusting = false;
+
+    // Get current thrust input state
+    bool currentThrusting = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up);
+
+    // Only consume fuel when actively applying thrust with keys
+    if (thrustLevel > 0.0f && currentThrusting) {
+        // Calculate mass to consume based on thrust level and time
+        float consumedMass = fuelConsumptionRate * thrustLevel * deltaTime;
+
+        // Don't consume more than we have
+        consumedMass = std::min(consumedMass, storedMass);
+
+        // Update stored mass and total mass
+        storedMass -= consumedMass;
+        mass = 1.0f + storedMass; // Base mass (1.0) + stored mass
+    }
+
+    // Store current thrust state for next frame
+    isThrusting = currentThrusting;
+}
+
+bool Rocket::hasFuel() const {
+    return storedMass > 0.0f;
 }
 
 void Rocket::setNearbyPlanets(const std::vector<Planet*>& planets) {
@@ -72,15 +102,18 @@ void Rocket::addPart(std::unique_ptr<RocketPart> part)
 
 void Rocket::applyThrust(float amount)
 {
-    // Calculate thrust direction based on rocket rotation
-    float radians = rotation * 3.14159f / 180.0f;
+    // Only apply thrust if we have fuel or if braking (negative thrust)
+    if (hasFuel() || amount < 0) {
+        // Calculate thrust direction based on rocket rotation
+        float radians = rotation * 3.14159f / 180.0f;
 
-    // In SFML, 0 degrees points up, 90 degrees points right
-    // So we need to use -sin for x and -cos for y to get the direction
-    sf::Vector2f thrustDir(std::sin(radians), -std::cos(radians));
+        // In SFML, 0 degrees points up, 90 degrees points right
+        // So we need to use -sin for x and -cos for y to get the direction
+        sf::Vector2f thrustDir(std::sin(radians), -std::cos(radians));
 
-    // Apply force and convert to acceleration by dividing by mass (F=ma -> a=F/m)
-    velocity += thrustDir * amount * thrustLevel / mass;
+        // Apply force and convert to acceleration by dividing by mass (F=ma -> a=F/m)
+        velocity += thrustDir * amount * thrustLevel / mass;
+    }
 }
 
 void Rocket::rotate(float amount)
@@ -156,6 +189,9 @@ Rocket* Rocket::mergeWith(Rocket* other)
 void Rocket::update(float deltaTime)
 {
     try {
+        // Consume fuel when thrusting
+        consumeFuel(deltaTime);
+
         bool resting = false;
 
         // Check if we're resting on any planet
@@ -223,7 +259,7 @@ void Rocket::draw(sf::RenderWindow& window)
         // Draw all rocket parts
         for (const auto& part : parts) {
             if (part) {
-                part->draw(window, position, rotation);
+                part->draw(window, position, rotation, 1.0f, thrustLevel, hasFuel());
             }
         }
     }
@@ -256,7 +292,7 @@ void Rocket::drawWithConstantSize(sf::RenderWindow& window, float zoomLevel)
         // Draw rocket parts with appropriate scaling
         for (const auto& part : parts) {
             if (part) {
-                part->draw(window, position, rotation, scaleMultiplier);
+                part->draw(window, position, rotation, scaleMultiplier, thrustLevel, hasFuel());
             }
         }
     }

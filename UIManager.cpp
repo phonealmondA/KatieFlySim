@@ -22,16 +22,16 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
     thrustMetricsPanel(font, 14, sf::Vector2f(10, 580), sf::Vector2f(300, 80)),
     multiplayerPanel(font, 14, sf::Vector2f(window.getSize().x - 310, 10), sf::Vector2f(300, 100)),
     increaseMassButton(
-        sf::Vector2f(320, 120), // Position to the right of planetInfoPanel
-        sf::Vector2f(30, 30),   // Small square button
-        "+",                    // Plus symbol
+        sf::Vector2f(320, 20), // Position to the right of planetInfoPanel
+        sf::Vector2f(80, 30),   // Small square button
+        "fuel --",                    // Plus symbol
         font,
         [this]() {
             if (nearestPlanet && activeVehicleManager) {
                 Rocket* rocket = activeVehicleManager->getRocket();
                 if (rocket && rocket->getStoredMass() > 0.0f) {
                     // Transfer 1 unit of mass from rocket to planet
-                    float massToTransfer = 0.1f;
+                    float massToTransfer = 0.01f;
                     rocket->addStoredMass(-massToTransfer); // Remove from rocket
                     nearestPlanet->setMass(nearestPlanet->getMass() + massToTransfer); // Add to planet
                 }
@@ -39,16 +39,16 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
         }
     ),
     decreaseMassButton(
-        sf::Vector2f(320, 160), // Position below increase button
-        sf::Vector2f(30, 30),   // Small square button
-        "-",                    // Minus symbol
+        sf::Vector2f(320, 60), // Position below increase button
+        sf::Vector2f(80, 30),   // Small square button
+        "fuel ++",                    // Minus symbol
         font,
         [this]() {
             if (nearestPlanet && activeVehicleManager) {
                 Rocket* rocket = activeVehicleManager->getRocket();
                 if (rocket && nearestPlanet->getMass() > 1.0f) { // Don't let planet go below 1 mass
                     // Transfer 1 unit of mass from planet to rocket
-                    float massToTransfer = 0.1f;
+                    float massToTransfer = 0.01f;
                     nearestPlanet->setMass(nearestPlanet->getMass() - massToTransfer); // Remove from planet
                     rocket->addStoredMass(massToTransfer); // Add to rocket
                 }
@@ -141,14 +141,14 @@ void UIManager::render()
 
         // Draw button labels
         sf::Text plusText(font, "");
-        plusText.setString("+");
+        plusText.setString("fuel --");
         plusText.setCharacterSize(20);
         plusText.setFillColor(sf::Color::White);
         plusText.setPosition(increaseMassButton.getPosition() + sf::Vector2f(10, 3));
         window.draw(plusText);
 
         sf::Text minusText(font, "");
-        minusText.setString("-");
+        minusText.setString("fuel ++");
         minusText.setCharacterSize(20);
         minusText.setFillColor(sf::Color::White);
         minusText.setPosition(decreaseMassButton.getPosition() + sf::Vector2f(10, 3));
@@ -178,9 +178,15 @@ void UIManager::updateRocketInfo(VehicleManager* vehicleManager)
             << std::sqrt(rocket->getVelocity().x * rocket->getVelocity().x +
                 rocket->getVelocity().y * rocket->getVelocity().y) << "\n";
         ss << "Mass: " << rocket->getMass() << std::endl;
-        ss << "Stored Mass: " << rocket->getStoredMass() << "\n";
+        ss << "Fuel: " << std::fixed << std::setprecision(1)
+            << rocket->getStoredMass() << " units\n";
         ss << "Thrust Level: " << std::fixed << std::setprecision(1)
             << rocket->getThrustLevel() * 100.0f << "%";
+
+        // Add a fuel warning if low
+        if (rocket->getStoredMass() < 0.2f) {
+            ss << "\nFUEL LOW!";
+        }
     }
     else {
         Car* car = vehicleManager->getCar();
@@ -319,8 +325,8 @@ void UIManager::updateThrustMetrics(VehicleManager* vehicleManager, const std::v
         }
     }
 
-    // Get current thrust level moddddd
-    float currentThrust = 100 * rocket->getThrustLevel();
+    // Get current thrust level
+    float currentThrust = maxThrust * rocket->getThrustLevel();
 
     // Calculate TWR (Thrust to Weight Ratio)
     float totalMass = rocket->getMass();
@@ -337,10 +343,23 @@ void UIManager::updateThrustMetrics(VehicleManager* vehicleManager, const std::v
 
     float twr = (weight > 0) ? currentThrust / weight : 0.0f;
 
+    // Calculate fuel consumption rate
+    float consumptionRate = GameConstants::BASE_FUEL_CONSUMPTION_RATE * rocket->getThrustLevel();
+    float burnTimeRemaining = rocket->getStoredMass() / consumptionRate;
+    if (rocket->getThrustLevel() < 0.001f) {
+        burnTimeRemaining = 0.0f; // Avoid division by near-zero
+    }
+
     std::stringstream ss;
     ss << "Thrust Metrics:\n";
-    ss << "Current Thrust: " << std::fixed << std::setprecision(1) << currentThrust << "\n";
-    ss << "TWR: " << std::fixed << std::setprecision(2) << twr;
+    ss << "Thrust: " << std::fixed << std::setprecision(1) << currentThrust << "\n";
+    ss << "TWR: " << std::fixed << std::setprecision(2) << twr << "\n";
+
+    // Only show burn time if we have fuel and are thrusting
+    if (rocket->hasFuel() && rocket->getThrustLevel() > 0.001f) {
+        ss << "Burn time: " << std::fixed << std::setprecision(1)
+            << burnTimeRemaining << "s";
+    }
 
     thrustMetricsPanel.setText(ss.str());
 }

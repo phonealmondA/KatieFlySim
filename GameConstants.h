@@ -1,3 +1,4 @@
+// GameConstants.h
 #pragma once
 #include <cmath>
 namespace GameConstants {
@@ -20,7 +21,7 @@ namespace GameConstants {
     constexpr float MAIN_PLANET_RADIUS = 10000.0f;  // Base radius at this mass
     constexpr float MASS_RATIO = 0.06f;  // Same as SECONDARY_PLANET_MASS / MAIN_PLANET_MASS
     constexpr float CUBE_ROOT_APPROX = 60.0f;  // Approximate cube root of 0.08
-    constexpr float SECONDARY_PLANET_RADIUS = (MAIN_PLANET_RADIUS / CUBE_ROOT_APPROX)/10000;  // ~430
+    constexpr float SECONDARY_PLANET_RADIUS = (MAIN_PLANET_RADIUS / CUBE_ROOT_APPROX) / 10000;  // ~430
 
     // Planet positions
     constexpr float MAIN_PLANET_X = 400.0f;
@@ -58,9 +59,13 @@ namespace GameConstants {
     constexpr float CAR_BODY_HEIGHT = 15.0f;  // Height of car body
 
     // Engine parameters - scaled with gravitational constant
-    constexpr float BASE_THRUST_MULTIPLIER = 0.50f;
+    constexpr float BASE_THRUST_MULTIPLIER = 1.875f;
     constexpr float ENGINE_THRUST_POWER = G * BASE_THRUST_MULTIPLIER;
 
     // Vehicle transformation parameters
     constexpr float TRANSFORM_VELOCITY_FACTOR = 0.1f;  // Velocity reduction when transforming from rocket to car
+
+    // Fuel constants
+    constexpr float BASE_FUEL_CONSUMPTION_RATE = 0.05f;  // Units of fuel consumed per second at full thrust
+    constexpr float FUEL_EFFICIENCY_MULTIPLIER = 1.0f;   // Higher values mean more efficient engines
 }

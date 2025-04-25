@@ -1,3 +1,4 @@
+// Engine.h
 #pragma once
 #include "RocketPart.h"
 
@@ -9,6 +10,7 @@ private:
 public:
     Engine(sf::Vector2f relPos, float thrustPower, sf::Color col = sf::Color(255, 100, 0));
 
-    void draw(sf::RenderWindow& window, sf::Vector2f rocketPos, float rotation, float scale = 1.0f) override;
+    void draw(sf::RenderWindow& window, sf::Vector2f rocketPos, float rotation,
+        float scale = 1.0f, float thrustLevel = 0.0f, bool hasFuel = true) override;
     float getThrust() const;
 };
