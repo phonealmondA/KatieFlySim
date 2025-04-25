@@ -163,6 +163,7 @@ void UIManager::updateRocketInfo(VehicleManager* vehicleManager)
         ss << "Speed: " << std::fixed << std::setprecision(1)
             << std::sqrt(rocket->getVelocity().x * rocket->getVelocity().x +
                 rocket->getVelocity().y * rocket->getVelocity().y) << "\n";
+        ss << "Mass: " << rocket->getMass() << std::endl; 
         ss << "Thrust Level: " << std::fixed << std::setprecision(1)
             << rocket->getThrustLevel() * 100.0f << "%";
     }
@@ -210,18 +211,21 @@ Planet* UIManager::findNearestPlanet(VehicleManager* vehicleManager, const std::
 void UIManager::updatePlanetInfo(VehicleManager* vehicleManager, const std::vector<Planet*>& planets)
 {
     if (!vehicleManager || planets.empty()) return;
-
     // Find nearest planet - already found in update()
     Planet* closestPlanet = nearestPlanet;
     if (!closestPlanet) return;
-
     // Calculate distance to nearest planet
     GameObject* vehicle = vehicleManager->getActiveVehicle();
     if (!vehicle) return;
-
     float dist = std::sqrt(
         std::pow(vehicle->getPosition().x - closestPlanet->getPosition().x, 2) +
         std::pow(vehicle->getPosition().y - closestPlanet->getPosition().y, 2)
+    );
+
+    // Calculate planet speed
+    float planetSpeed = std::sqrt(
+        std::pow(closestPlanet->getVelocity().x, 2) +
+        std::pow(closestPlanet->getVelocity().y, 2)
     );
 
     std::stringstream ss;
@@ -229,13 +233,12 @@ void UIManager::updatePlanetInfo(VehicleManager* vehicleManager, const std::vect
     ss << "Distance: " << std::fixed << std::setprecision(1) << dist << "\n";
     ss << "Mass: " << std::fixed << std::setprecision(1) << closestPlanet->getMass() << "\n";
     ss << "Radius: " << std::fixed << std::setprecision(1) << closestPlanet->getRadius() << "\n";
+    ss << "Speed: " << std::fixed << std::setprecision(1) << planetSpeed << "\n";
     ss << "Surface Gravity: " << std::fixed << std::setprecision(2)
         << (GameConstants::G * closestPlanet->getMass() /
             (closestPlanet->getRadius() * closestPlanet->getRadius())) << "\n";
-
     // Add the mass adjustment hint
     ss << "Click +/- to adjust mass";
-
     planetInfoPanel.setText(ss.str());
 }
 
