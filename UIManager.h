@@ -4,6 +4,7 @@
 #include "TextPanel.h"
 #include "VehicleManager.h"
 #include "Planet.h"
+#include "Button.h"
 
 class UIManager {
 private:
@@ -18,6 +19,11 @@ private:
     TextPanel controlsPanel;
     TextPanel thrustMetricsPanel;
     TextPanel multiplayerPanel;
+
+    // Planet mass control buttons
+    Button increaseMassButton;
+    Button decreaseMassButton;
+    Planet* nearestPlanet;
 
     bool isMultiplayer;
     bool isHost;
@@ -34,4 +40,7 @@ public:
     void updateOrbitInfo(VehicleManager* vehicleManager, const std::vector<Planet*>& planets);
     void updateThrustMetrics(VehicleManager* vehicleManager, const std::vector<Planet*>& planets);
     void updateMultiplayerInfo(int connectedClients, bool connected, int playerId, int pingMs);
+
+    // Find nearest planet to vehicle
+    Planet* findNearestPlanet(VehicleManager* vehicleManager, const std::vector<Planet*>& planets);
 };

@@ -1,11 +1,10 @@
 // UIManager.cpp
 #include "UIManager.h"
 #include "OrbitalMechanics.h"
-#include "GameConstants.h"
 #include <sstream>
 #include <iomanip>
-#include <limits>
 #include <cmath>
+#include <string>
 
 UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView, bool multiplayer, bool host)
     : window(window),
@@ -13,195 +12,275 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
     uiView(uiView),
     isMultiplayer(multiplayer),
     isHost(host),
-    rocketInfoPanel(font, 12, sf::Vector2f(10, 10), sf::Vector2f(250, 150)),
-    planetInfoPanel(font, 12, sf::Vector2f(10, 170), sf::Vector2f(250, 120)),
-    orbitInfoPanel(font, 12, sf::Vector2f(10, 300), sf::Vector2f(250, 100)),
-    controlsPanel(font, 12, sf::Vector2f(10, 410), sf::Vector2f(250, 120)),
-    thrustMetricsPanel(font, 12, sf::Vector2f(10, 530), sf::Vector2f(250, 80)),
-    multiplayerPanel(font, 12, sf::Vector2f(10, 620), sf::Vector2f(250, 90))
+    nearestPlanet(nullptr),
+    // Initialize all objects in the initializer list
+    rocketInfoPanel(font, 14, sf::Vector2f(10, 10), sf::Vector2f(300, 100)),
+    planetInfoPanel(font, 14, sf::Vector2f(10, 120), sf::Vector2f(300, 120)),
+    orbitInfoPanel(font, 14, sf::Vector2f(10, 250), sf::Vector2f(300, 100)),
+    controlsPanel(font, 14, sf::Vector2f(10, 360), sf::Vector2f(300, 160)),
+    thrustMetricsPanel(font, 14, sf::Vector2f(10, 530), sf::Vector2f(300, 80)),
+    multiplayerPanel(font, 14, sf::Vector2f(window.getSize().x - 310, 10), sf::Vector2f(300, 100)),
+    increaseMassButton(
+        sf::Vector2f(320, 120), // Position to the right of planetInfoPanel
+        sf::Vector2f(30, 30),   // Small square button
+        "+",                    // Plus symbol
+        font,
+        [this]() {
+            if (nearestPlanet) {
+                float currentMass = nearestPlanet->getMass();
+                nearestPlanet->setMass(currentMass + 1.0f); // Increase by 00.1%
+            }
+        }
+    ),
+    decreaseMassButton(
+        sf::Vector2f(320, 160), // Position below increase button
+        sf::Vector2f(30, 30),   // Small square button
+        "-",                    // Minus symbol
+        font,
+        [this]() {
+            if (nearestPlanet) {
+                float currentMass = nearestPlanet->getMass();
+                nearestPlanet->setMass(currentMass - 1.0f); // Decrease by 10%
+            }
+        }
+    )
 {
-    // Set up controls info panel
-    std::string controlsText;
+    // Set default control instructions
+    std::string controlText;
     if (isMultiplayer && !isHost) {
         // Client controls
-        controlsText =
-            "CONTROLS:\n"
-            "WAD: Move/Steer\n"
-            "1-9: Set thrust level\n"
-            "L: Transform vehicle\n"
-            "Z: Zoom out\n"
-            "X: Auto-zoom\n"
-            "C: Focus planet 2";
+        controlText = "Controls:\n"
+            "W - Forward Thrust\n"
+            "S - Backward Thrust\n"
+            "A - Rotate Left\n"
+            "D - Rotate Right\n"
+            "L - Transform Vehicle\n"
+            "1-9 - Set Thrust Level\n"
+            "0 - Zero Thrust";
     }
     else {
-        // Server or single player
-        controlsText =
-            "CONTROLS:\n"
-            "Arrows: Move/Steer\n"
-            "1-9: Set thrust level\n"
-            "L: Transform vehicle\n"
-            "Z: Zoom out\n"
-            "X: Auto-zoom\n"
-            "C: Focus planet 2";
+        // Host or single player controls
+        controlText = "Controls:\n"
+            "Arrow Up - Forward Thrust\n"
+            "Arrow Down - Backward Thrust\n"
+            "Arrow Left - Rotate Left\n"
+            "Arrow Right - Rotate Right\n"
+            "L - Transform Vehicle\n"
+            "1-9 - Set Thrust Level\n"
+            "0 - Zero Thrust";
     }
-
-    if (isMultiplayer) {
-        controlsText += "\n\nMULTIPLAYER MODE: ";
-        controlsText += isHost ? "SERVER" : "CLIENT";
-    }
-
-    controlsPanel.setText(controlsText);
+    controlsPanel.setText(controlText);
 }
 
 void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*>& planets, float deltaTime)
 {
+    // Only update if we have a valid vehicle manager
+    if (!vehicleManager) return;
+
+    // Find nearest planet for planet info display and mass buttons
+    nearestPlanet = findNearestPlanet(vehicleManager, planets);
+
+    // Update UI panels
     updateRocketInfo(vehicleManager);
     updatePlanetInfo(vehicleManager, planets);
     updateOrbitInfo(vehicleManager, planets);
     updateThrustMetrics(vehicleManager, planets);
 
-    if (isMultiplayer) {
-        updateMultiplayerInfo(0, true, 0, 0); // Placeholder values
+    // Update button states - check if mouse is hovering over buttons
+    sf::Vector2i mousePosition = sf::Mouse::getPosition(window);
+    sf::Vector2f mousePosView = window.mapPixelToCoords(mousePosition, uiView);
+
+    increaseMassButton.update(mousePosView);
+    decreaseMassButton.update(mousePosView);
+
+    // Check for button clicks
+    if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
+        increaseMassButton.handleClick();
+        decreaseMassButton.handleClick();
     }
 }
 
 void UIManager::render()
 {
-    // Switch to UI view
+    // Save current view
+    sf::View currentView = window.getView();
+
+    // Apply UI view for interface rendering
     window.setView(uiView);
 
-    // Draw all panels
+    // Draw UI panels
     rocketInfoPanel.draw(window);
     planetInfoPanel.draw(window);
     orbitInfoPanel.draw(window);
     controlsPanel.draw(window);
     thrustMetricsPanel.draw(window);
 
+    // Draw multiplayer panel if in multiplayer mode
     if (isMultiplayer) {
         multiplayerPanel.draw(window);
     }
+
+    // Draw planet mass control buttons
+    if (nearestPlanet) {
+        increaseMassButton.draw(window);
+        decreaseMassButton.draw(window);
+
+        // Draw button labels
+        sf::Text plusText(font, "");
+        plusText.setString("+");
+        plusText.setCharacterSize(20);
+        plusText.setFillColor(sf::Color::White);
+        plusText.setPosition(increaseMassButton.getPosition() + sf::Vector2f(10, 3));
+        window.draw(plusText);
+
+        sf::Text minusText(font, "");
+        minusText.setString("-");
+        minusText.setCharacterSize(20);
+        minusText.setFillColor(sf::Color::White);
+        minusText.setPosition(decreaseMassButton.getPosition() + sf::Vector2f(10, 3));
+        window.draw(minusText);
+    }
+
+    // Restore previous view
+    window.setView(currentView);
 }
 
 void UIManager::updateRocketInfo(VehicleManager* vehicleManager)
 {
+    if (!vehicleManager) return;
+
     std::stringstream ss;
+
     if (vehicleManager->getActiveVehicleType() == VehicleType::ROCKET) {
         Rocket* rocket = vehicleManager->getRocket();
-        float speed = std::sqrt(rocket->getVelocity().x * rocket->getVelocity().x +
-            rocket->getVelocity().y * rocket->getVelocity().y);
+        if (!rocket) return;
 
-        ss << "ROCKET INFO\n"
-            << "Mass: " << rocket->getMass() << " units\n"
-            << "Speed: " << std::fixed << std::setprecision(1) << speed << " units/s\n"
-            << "Velocity: (" << std::setprecision(1) << rocket->getVelocity().x << ", "
-            << rocket->getVelocity().y << ")\n";
-
-        // Calculate total gravity force from all planets
-        float totalForce = 0.0f;
-
-        // Can't calculate forces here without planets, so this will be updated in the full method
+        ss << "Rocket Info:\n";
+        ss << "Position: (" << std::fixed << std::setprecision(1)
+            << rocket->getPosition().x << ", " << rocket->getPosition().y << ")\n";
+        ss << "Velocity: (" << std::fixed << std::setprecision(1)
+            << rocket->getVelocity().x << ", " << rocket->getVelocity().y << ")\n";
+        ss << "Speed: " << std::fixed << std::setprecision(1)
+            << std::sqrt(rocket->getVelocity().x * rocket->getVelocity().x +
+                rocket->getVelocity().y * rocket->getVelocity().y) << "\n";
+        ss << "Thrust Level: " << std::fixed << std::setprecision(1)
+            << rocket->getThrustLevel() * 100.0f << "%";
     }
     else {
         Car* car = vehicleManager->getCar();
-        ss << "CAR INFO\n"
-            << "On Ground: " << (car->isOnGround() ? "Yes" : "No") << "\n"
-            << "Position: (" << std::fixed << std::setprecision(1)
-            << car->getPosition().x << ", " << car->getPosition().y << ")\n"
-            << "Orientation: " << std::setprecision(1) << car->getRotation() << " degrees\n"
-            << "Press L to transform back to rocket when on ground";
+        if (!car) return;
+
+        ss << "Car Info:\n";
+        ss << "Position: (" << std::fixed << std::setprecision(1)
+            << car->getPosition().x << ", " << car->getPosition().y << ")\n";
+        ss << "Direction: " << (car->getIsFacingRight() ? "Right" : "Left") << "\n";
+        ss << "On Ground: " << (car->isOnGround() ? "Yes" : "No");
     }
 
     rocketInfoPanel.setText(ss.str());
 }
 
-void UIManager::updatePlanetInfo(VehicleManager* vehicleManager, const std::vector<Planet*>& planets)
+Planet* UIManager::findNearestPlanet(VehicleManager* vehicleManager, const std::vector<Planet*>& planets)
 {
-    std::stringstream ss;
-    Planet* closestPlanet = nullptr;
-    float closestDistance = std::numeric_limits<float>::max();
-    GameObject* activeVehicle = vehicleManager->getActiveVehicle();
+    if (!vehicleManager || planets.empty()) return nullptr;
 
-    for (const auto& planetPtr : planets) {
-        sf::Vector2f direction = planetPtr->getPosition() - activeVehicle->getPosition();
-        float dist = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+    GameObject* vehicle = vehicleManager->getActiveVehicle();
+    if (!vehicle) return nullptr;
+
+    Planet* closest = nullptr;
+    float closestDistance = std::numeric_limits<float>::max();
+
+    for (Planet* planet : planets) {
+        if (!planet) continue;
+
+        float dist = std::sqrt(
+            std::pow(vehicle->getPosition().x - planet->getPosition().x, 2) +
+            std::pow(vehicle->getPosition().y - planet->getPosition().y, 2)
+        );
 
         if (dist < closestDistance) {
             closestDistance = dist;
-            closestPlanet = const_cast<Planet*>(planetPtr);
+            closest = planet;
         }
     }
 
-    if (closestPlanet) {
-        std::string planetName = (closestPlanet == planets[0]) ? "Blue Planet" : "Green Planet";
-        float speed = std::sqrt(closestPlanet->getVelocity().x * closestPlanet->getVelocity().x +
-            closestPlanet->getVelocity().y * closestPlanet->getVelocity().y);
+    return closest;
+}
 
-        ss << "NEAREST PLANET: " << planetName << "\n"
-            << "Distance: " << std::fixed << std::setprecision(0) << closestDistance << " units\n"
-            << "Mass: " << closestPlanet->getMass() << " units\n"
-            << "Radius: " << closestPlanet->getRadius() << " units\n"
-            << "Speed: " << std::setprecision(1) << speed << " units/s\n"
-            << "Surface gravity: " << std::setprecision(2)
-            << GameConstants::G * closestPlanet->getMass() /
-            (closestPlanet->getRadius() * closestPlanet->getRadius()) << " units/s²";
-    }
+void UIManager::updatePlanetInfo(VehicleManager* vehicleManager, const std::vector<Planet*>& planets)
+{
+    if (!vehicleManager || planets.empty()) return;
+
+    // Find nearest planet - already found in update()
+    Planet* closestPlanet = nearestPlanet;
+    if (!closestPlanet) return;
+
+    // Calculate distance to nearest planet
+    GameObject* vehicle = vehicleManager->getActiveVehicle();
+    if (!vehicle) return;
+
+    float dist = std::sqrt(
+        std::pow(vehicle->getPosition().x - closestPlanet->getPosition().x, 2) +
+        std::pow(vehicle->getPosition().y - closestPlanet->getPosition().y, 2)
+    );
+
+    std::stringstream ss;
+    ss << "Nearest Planet Info:\n";
+    ss << "Distance: " << std::fixed << std::setprecision(1) << dist << "\n";
+    ss << "Mass: " << std::fixed << std::setprecision(1) << closestPlanet->getMass() << "\n";
+    ss << "Radius: " << std::fixed << std::setprecision(1) << closestPlanet->getRadius() << "\n";
+    ss << "Surface Gravity: " << std::fixed << std::setprecision(2)
+        << (GameConstants::G * closestPlanet->getMass() /
+            (closestPlanet->getRadius() * closestPlanet->getRadius())) << "\n";
+
+    // Add the mass adjustment hint
+    ss << "Click +/- to adjust mass";
 
     planetInfoPanel.setText(ss.str());
 }
 
 void UIManager::updateOrbitInfo(VehicleManager* vehicleManager, const std::vector<Planet*>& planets)
 {
+    if (!vehicleManager || planets.empty() ||
+        vehicleManager->getActiveVehicleType() != VehicleType::ROCKET) return;
+
+    Rocket* rocket = vehicleManager->getRocket();
+    if (!rocket) return;
+
+    // Use the already found nearest planet
+    Planet* closestPlanet = nearestPlanet;
+    if (!closestPlanet) return;
+
+    // Get relative position and velocity
+    sf::Vector2f relPos = rocket->getPosition() - closestPlanet->getPosition();
+    sf::Vector2f relVel = rocket->getVelocity() - closestPlanet->getVelocity();
+
+    // Calculate orbital parameters
+    float periapsis = OrbitalMechanics::calculatePeriapsis(relPos, relVel, closestPlanet->getMass(), GameConstants::G);
+    float apoapsis = OrbitalMechanics::calculateApoapsis(relPos, relVel, closestPlanet->getMass(), GameConstants::G);
+    float period = OrbitalMechanics::calculateOrbitalPeriod(
+        (periapsis + apoapsis) / 2.0f, closestPlanet->getMass(), GameConstants::G);
+    float eccentricity = OrbitalMechanics::calculateEccentricity(relPos, relVel, closestPlanet->getMass(), GameConstants::G);
+
     std::stringstream ss;
+    ss << "Orbit Info (nearest planet):\n";
 
-    if (vehicleManager->getActiveVehicleType() == VehicleType::ROCKET) {
-        Rocket* rocket = vehicleManager->getRocket();
-        Planet* primaryBody = nullptr;
-        float strongestGravity = 0.0f;
-
-        // Find the primary gravitational body (usually the closest one)
-        for (const auto& planetPtr : planets) {
-            sf::Vector2f direction = planetPtr->getPosition() - rocket->getPosition();
-            float dist = std::sqrt(direction.x * direction.x + direction.y * direction.y);
-
-            float gravityStrength = GameConstants::G * planetPtr->getMass() / (dist * dist);
-            if (gravityStrength > strongestGravity) {
-                strongestGravity = gravityStrength;
-                primaryBody = const_cast<Planet*>(planetPtr);
-            }
-        }
-
-        if (primaryBody) {
-            // Calculate relative position and velocity to primary body
-            sf::Vector2f relPos = rocket->getPosition() - primaryBody->getPosition();
-            sf::Vector2f relVel = rocket->getVelocity() - primaryBody->getVelocity();
-
-            // Calculate orbit parameters
-            float apoapsis = OrbitalMechanics::calculateApoapsis(relPos, relVel, primaryBody->getMass(), GameConstants::G);
-            float periapsis = OrbitalMechanics::calculatePeriapsis(relPos, relVel, primaryBody->getMass(), GameConstants::G);
-
-            // Current distance
-            float distance = std::sqrt(relPos.x * relPos.x + relPos.y * relPos.y);
-
-            // Check if orbit is valid (not hyperbolic)
-            if (periapsis > 0 && apoapsis > 0) {
-                ss << "ORBIT INFO\n"
-                    << "Primary: " << (primaryBody == planets[0] ? "Blue Planet" : "Green Planet") << "\n"
-                    << "Periapsis: " << std::fixed << std::setprecision(0) << periapsis << " units\n"
-                    << "Apoapsis: " << std::setprecision(0) << apoapsis << " units\n"
-                    << "Current dist: " << std::setprecision(0) << distance << " units";
-            }
-            else {
-                ss << "ORBIT INFO\n"
-                    << "Primary: " << (primaryBody == planets[0] ? "Blue Planet" : "Green Planet") << "\n"
-                    << "Orbit: Escape trajectory\n"
-                    << "Current dist: " << std::fixed << std::setprecision(0) << distance << " units";
-            }
-        }
+    // If we're in a valid orbit
+    if (periapsis > closestPlanet->getRadius() && !std::isnan(periapsis) && !std::isnan(apoapsis) &&
+        apoapsis > periapsis && eccentricity < 1.0f) {
+        ss << "Periapsis: " << std::fixed << std::setprecision(1) << periapsis << "\n";
+        ss << "Apoapsis: " << std::fixed << std::setprecision(1) << apoapsis << "\n";
+        ss << "Period: " << std::fixed << std::setprecision(1) << period << "s\n";
+        ss << "Eccentricity: " << std::fixed << std::setprecision(3) << eccentricity;
+    }
+    else if (eccentricity >= 1.0f) {
+        ss << "Hyperbolic trajectory\n";
+        ss << "Periapsis: " << std::fixed << std::setprecision(1) << periapsis << "\n";
+        ss << "Eccentricity: " << std::fixed << std::setprecision(3) << eccentricity;
     }
     else {
-        ss << "ORBIT INFO\n"
-            << "Not available in car mode\n"
-            << "Transform to rocket for orbital data";
+        ss << "Not in stable orbit\n";
+        ss << "Impact predicted!";
     }
 
     orbitInfoPanel.setText(ss.str());
@@ -209,95 +288,63 @@ void UIManager::updateOrbitInfo(VehicleManager* vehicleManager, const std::vecto
 
 void UIManager::updateThrustMetrics(VehicleManager* vehicleManager, const std::vector<Planet*>& planets)
 {
-    if (vehicleManager->getActiveVehicleType() == VehicleType::ROCKET) {
-        Rocket* rocket = vehicleManager->getRocket();
-        sf::Vector2f rocketPos = rocket->getPosition();
+    if (!vehicleManager || vehicleManager->getActiveVehicleType() != VehicleType::ROCKET) return;
 
-        // Calculate the closest planet for gravity reference
-        Planet* closestPlanet = nullptr;
-        float closestDistance = std::numeric_limits<float>::max();
+    Rocket* rocket = vehicleManager->getRocket();
+    if (!rocket) return;
 
-        for (const auto& planetPtr : planets) {
-            float dist = std::sqrt(std::pow(rocketPos.x - planetPtr->getPosition().x, 2) +
-                std::pow(rocketPos.y - planetPtr->getPosition().y, 2));
-            if (dist < closestDistance) {
-                closestDistance = dist;
-                closestPlanet = const_cast<Planet*>(planetPtr);
-            }
-        }
-
-        if (closestPlanet) {
-            // Calculate gravity force and direction
-            sf::Vector2f towardsPlanet = closestPlanet->getPosition() - rocketPos;
-            float dist = std::sqrt(towardsPlanet.x * towardsPlanet.x + towardsPlanet.y * towardsPlanet.y);
-            sf::Vector2f gravityDir;
-            if (dist > 0) {
-                gravityDir = sf::Vector2f(towardsPlanet.x / dist, towardsPlanet.y / dist);
-            }
-            else {
-                gravityDir = sf::Vector2f(0, 0);
-            }
-
-            // Calculate weight (gravity force) at current position
-            float weight = GameConstants::G * rocket->getMass() * closestPlanet->getMass() / (dist * dist);
-
-            // Calculate current thrust force based on thrust level
-            float maxThrust = 0.0f;
-            for (const auto& part : rocket->getParts()) {
-                if (auto* engine = dynamic_cast<Engine*>(part.get())) {
-                    maxThrust += engine->getThrust();
-                }
-            }
-            float currentThrust = maxThrust * rocket->getThrustLevel();
-
-            // Calculate expected acceleration (thrust/mass - gravity)
-            float thrustToWeightRatio = currentThrust / (weight > 0 ? weight : 1.0f);
-
-            // Calculate expected acceleration along the thrust direction
-            float radians = rocket->getRotation() * 3.14159f / 180.0f;
-            sf::Vector2f thrustDir(std::sin(radians), -std::cos(radians));
-
-            // Project gravity onto thrust direction (negative if opposing thrust)
-            float projectedGravity = gravityDir.x * thrustDir.x + gravityDir.y * thrustDir.y;
-            float gravityComponent = weight * projectedGravity;
-
-            // Net acceleration along thrust direction
-            float netAccel = (currentThrust - gravityComponent) / rocket->getMass();
-
-            // Set the text content
-            std::stringstream ss;
-            ss << "THRUST METRICS\n"
-                << "Thrust Level: " << std::fixed << std::setprecision(2) << rocket->getThrustLevel() * 100.0f << "%\n"
-                << "Thrust-to-Weight Ratio: " << std::setprecision(2) << thrustToWeightRatio << "\n"
-                << "Expected Acceleration: " << std::setprecision(2) << netAccel << " units/s²\n"
-                << "Escape Velocity: " << std::setprecision(0)
-                << std::sqrt(2.0f * GameConstants::G * closestPlanet->getMass() / dist) << " units/s";
-
-            thrustMetricsPanel.setText(ss.str());
-        }
-        else {
-            thrustMetricsPanel.setText("THRUST METRICS\nNo planet in range");
+    // Get max thrust for the rocket
+    float maxThrust = 0.0f;
+    for (const auto& part : rocket->getParts()) {
+        if (const Engine* engine = dynamic_cast<const Engine*>(part.get())) {
+            maxThrust += engine->getThrust();
         }
     }
-    else {
-        thrustMetricsPanel.setText("THRUST METRICS\nNot available in car mode");
+
+    // Get current thrust level
+    float currentThrust = maxThrust * rocket->getThrustLevel();
+
+    // Calculate TWR (Thrust to Weight Ratio)
+    float totalMass = rocket->getMass();
+    float weight = 0.0f;
+
+    // Find planet generating most gravity
+    if (!planets.empty() && nearestPlanet) {
+        // Use nearest planet for weight calculation
+        sf::Vector2f relPos = rocket->getPosition() - nearestPlanet->getPosition();
+        float distance = std::sqrt(relPos.x * relPos.x + relPos.y * relPos.y);
+        weight = GameConstants::G * nearestPlanet->getMass() * totalMass /
+            (distance * distance);
     }
+
+    float twr = (weight > 0) ? currentThrust / weight : 0.0f;
+
+    std::stringstream ss;
+    ss << "Thrust Metrics:\n";
+    ss << "Current Thrust: " << std::fixed << std::setprecision(1) << currentThrust << "\n";
+    ss << "TWR: " << std::fixed << std::setprecision(2) << twr;
+
+    thrustMetricsPanel.setText(ss.str());
 }
 
 void UIManager::updateMultiplayerInfo(int connectedClients, bool connected, int playerId, int pingMs)
 {
+    if (!isMultiplayer) return;
+
     std::stringstream ss;
-    ss << "MULTIPLAYER STATUS\n";
-    ss << "Mode: " << (isHost ? "Host" : "Client") << "\n";
+    ss << "Network Info:\n";
 
     if (isHost) {
+        ss << "Role: Server\n";
         ss << "Connected clients: " << connectedClients << "\n";
     }
     else {
-        ss << "Connected to server: " << (connected ? "Yes" : "No") << "\n";
-        ss << "Local player ID: " << playerId << "\n";
+        ss << "Role: Client\n";
+        ss << "Player ID: " << playerId << "\n";
         ss << "Ping: " << pingMs << "ms\n";
     }
+
+    ss << "Status: " << (connected ? "Connected" : "Disconnected");
 
     multiplayerPanel.setText(ss.str());
 }
