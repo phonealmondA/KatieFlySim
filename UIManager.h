@@ -26,7 +26,7 @@ private:
     Planet* nearestPlanet;
     VehicleManager* activeVehicleManager;
 
-
+    Planet* selectedPlanet;
 
 
     Button increaseThrustButton;
@@ -48,7 +48,7 @@ public:
     void updateOrbitInfo(VehicleManager* vehicleManager, const std::vector<Planet*>& planets);
     void updateThrustMetrics(VehicleManager* vehicleManager, const std::vector<Planet*>& planets);
     void updateMultiplayerInfo(int connectedClients, bool connected, int playerId, int pingMs);
-
+    void setSelectedPlanet(Planet* planet) { selectedPlanet = planet; }
     // Find nearest planet to vehicle
     Planet* findNearestPlanet(VehicleManager* vehicleManager, const std::vector<Planet*>& planets);
 };

@@ -9,16 +9,19 @@
 #include <cmath>
 #include <limits>
 
-GameManager::GameManager(sf::RenderWindow& window)
+
+GameManager::GameManager(sf::RenderWindow& window, UIManager* ui)
     : window(window),
     gameView(sf::Vector2f(640.f, 360.f), sf::Vector2f(1280.f, 720.f)),
     uiView(sf::Vector2f(640.f, 360.f), sf::Vector2f(1280.f, 720.f)),
     zoomLevel(1.0f),
-    targetZoom(1.0f)
+    targetZoom(1.0f),
+    uiManager(ui)
 {
     // Initialize clock
     clock.restart();
 }
+
 
 GameManager::~GameManager()
 {

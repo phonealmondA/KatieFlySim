@@ -177,7 +177,7 @@ int main(int argc, char* argv[])
     }
 
     // Initialize game manager
-    GameManager gameManager(window);
+    GameManager gameManager(window, &uiManager);
 
     // For multiplayer, we'll need to connect to the network components
     VehicleManager* activeVehicleManager = nullptr;

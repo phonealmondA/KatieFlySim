@@ -19,6 +19,8 @@ private:
     VehicleManager* activeVehicleManager;
     GravitySimulator gravitySimulator;
 
+    UIManager* uiManager;  // Reference to UI manager
+
 public:
     GameManager(sf::RenderWindow& window);
     ~GameManager();

@@ -5,7 +5,6 @@
 #include <iomanip>
 #include <cmath>
 #include <string>
-
 UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView, bool multiplayer, bool host)
     : window(window),
     font(font),
@@ -13,6 +12,7 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
     isMultiplayer(multiplayer),
     isHost(host),
     nearestPlanet(nullptr),
+    selectedPlanet(nullptr),
     activeVehicleManager(nullptr),
     // Initialize all panels
     rocketInfoPanel(font, 14, sf::Vector2f(10, 10), sf::Vector2f(300, 150)),
@@ -28,13 +28,13 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
         "fuel --",
         font,
         [this]() {
-            if (nearestPlanet && activeVehicleManager) {
+            if (selectedPlanet && activeVehicleManager) {
                 Rocket* rocket = activeVehicleManager->getRocket();
                 if (rocket && rocket->getStoredMass() > 0.0f) {
                     // Transfer 0.01 units of mass from rocket to planet
                     float massToTransfer = 0.01f;
                     rocket->addStoredMass(-massToTransfer); // Remove from rocket
-                    nearestPlanet->setMass(nearestPlanet->getMass() + massToTransfer); // Add to planet
+                    selectedPlanet->setMass(selectedPlanet->getMass() + massToTransfer); // Add to planet
                 }
             }
         }
@@ -45,12 +45,12 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
         "fuel ++",
         font,
         [this]() {
-            if (nearestPlanet && activeVehicleManager) {
+            if (selectedPlanet && activeVehicleManager) {
                 Rocket* rocket = activeVehicleManager->getRocket();
-                if (rocket && nearestPlanet->getMass() > 1.0f) { // Don't let planet go below 1 mass
+                if (rocket && selectedPlanet->getMass() > 1.0f) { // Don't let planet go below 1 mass
                     // Transfer 0.01 units of mass from planet to rocket
                     float massToTransfer = 0.01f;
-                    nearestPlanet->setMass(nearestPlanet->getMass() - massToTransfer); // Remove from planet
+                    selectedPlanet->setMass(selectedPlanet->getMass() - massToTransfer); // Remove from planet
                     rocket->addStoredMass(massToTransfer); // Add to rocket
                 }
             }
@@ -87,153 +87,163 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
             }
         }
     )
+
+    void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*>& planets, float deltaTime)
 {
-    // Set default control instructions
-    std::string controlText;
-    if (isMultiplayer && !isHost) {
-        // Client controls
-        controlText = "Controls:\n"
-            "W - Forward Thrust\n"
-            "S - Backward Thrust\n"
-            "A - Rotate Left\n"
-            "D - Rotate Right\n"
-            "L - Transform Vehicle\n"
-            "1-9 - Set Thrust Level\n"
-            "0 - Zero Thrust";
+    // Store the current vehicle manager
+    activeVehicleManager = vehicleManager;
+
+    // Only update if we have a valid vehicle manager
+    if (!vehicleManager) return;
+
+    // Find nearest planet for planet info display and mass buttons
+    nearestPlanet = findNearestPlanet(vehicleManager, planets);
+
+    // If no planet is manually selected, use the nearest
+    if (!selectedPlanet) {
+        selectedPlanet = nearestPlanet;
     }
     else {
-        // Host or single player controls
-        controlText = "Controls:\n"
-            "Arrow Up - Forward Thrust\n"
-            "Arrow Down - Backward Thrust\n"
-            "Arrow Left - Rotate Left\n"
-            "Arrow Right - Rotate Right\n"
-            "L - Transform Vehicle\n"
-            "1-9 - Set Thrust Level\n"
-            "0 - Zero Thrust";
+        // Check if the selected planet still exists in the planets vector
+        bool found = false;
+        for (auto* planet : planets) {
+            if (planet == selectedPlanet) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            // The selected planet was removed, fall back to nearest
+            selectedPlanet = nearestPlanet;
+        }
     }
-    controlsPanel.setText(controlText);
+
+    // Update UI panels
+    updateRocketInfo(vehicleManager);
+    updatePlanetInfo(vehicleManager, planets);
+    updateOrbitInfo(vehicleManager, planets);
+    updateThrustMetrics(vehicleManager, planets);
+
+    // Update button states - check if mouse is hovering over buttons
+    sf::Vector2i mousePosition = sf::Mouse::getPosition(window);
+    sf::Vector2f mousePosView = window.mapPixelToCoords(mousePosition, uiView);
+
+    increaseMassButton.update(mousePosView);
+    decreaseMassButton.update(mousePosView);
+
+    // Also update the new engine upgrade buttons
+    increaseThrustButton.update(mousePosView);
+    increaseEfficiencyButton.update(mousePosView);
+
+    // Check for button clicks
+    if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
+        increaseMassButton.handleClick();
+        decreaseMassButton.handleClick();
+
+        // Also handle clicks for the new buttons
+        increaseThrustButton.handleClick();
+        increaseEfficiencyButton.handleClick();
+    }
+}
+
+void UIManager::render()
+{
+    // Save current view
+    sf::View currentView = window.getView();
+
+    // Apply UI view for interface rendering
+    window.setView(uiView);
+
+    // Draw UI panels
+    rocketInfoPanel.draw(window);
+    planetInfoPanel.draw(window);
+    orbitInfoPanel.draw(window);
+    controlsPanel.draw(window);
+    thrustMetricsPanel.draw(window);
+
+    // Draw multiplayer panel if in multiplayer mode
+    if (isMultiplayer) {
+        multiplayerPanel.draw(window);
+    }
+
+    // Draw planet mass control buttons
+    if (selectedPlanet) {
+        increaseMassButton.draw(window);
+        decreaseMassButton.draw(window);
+
+        // Draw button labels
+        sf::Text plusText(font, "");
+        plusText.setString("fuel --");
+        plusText.setCharacterSize(20);
+        plusText.setFillColor(sf::Color::White);
+        plusText.setPosition(increaseMassButton.getPosition() + sf::Vector2f(10, 3));
+        window.draw(plusText);
+
+        sf::Text minusText(font, "");
+        minusText.setString("fuel ++");
+        minusText.setCharacterSize(20);
+        minusText.setFillColor(sf::Color::White);
+        minusText.setPosition(decreaseMassButton.getPosition() + sf::Vector2f(10, 3));
+        window.draw(minusText);
+    }
+
+    // Draw engine upgrade buttons when in rocket mode
+    if (activeVehicleManager && activeVehicleManager->getActiveVehicleType() == VehicleType::ROCKET) {
+        increaseThrustButton.draw(window);
+        increaseEfficiencyButton.draw(window);
+
+        // Draw button labels
+        sf::Text thrustText(font, "");
+        thrustText.setString("Thrust +");
+        thrustText.setCharacterSize(16);
+        thrustText.setFillColor(sf::Color::White);
+        thrustText.setPosition(increaseThrustButton.getPosition() + sf::Vector2f(10, 7));
+        window.draw(thrustText);
+
+        sf::Text effText(font, "");
+        effText.setString("Fuel Eff +");
+        effText.setCharacterSize(16);
+        effText.setFillColor(sf::Color::White);
+        effText.setPosition(increaseEfficiencyButton.getPosition() + sf::Vector2f(5, 7));
+        window.draw(effText);
+
+        // Show upgrade cost
+        sf::Text costText(font, "");
+        std::stringstream ss;
+        ss << "Cost: " << std::fixed << std::setprecision(2) << upgradeCost;
+        costText.setString(ss.str());
+        costText.setCharacterSize(12);
+        costText.setFillColor(sf::Color::Yellow);
+        costText.setPosition(increaseThrustButton.getPosition() + sf::Vector2f(85, 10));
+        window.draw(costText);
+
+        sf::Text costText2 = costText;
+        costText2.setPosition(increaseEfficiencyButton.getPosition() + sf::Vector2f(85, 10));
+        window.draw(costText2);
+    }
+
+    // Restore previous view to draw selected planet highlight in world coordinates
+    window.setView(currentView);
+
+    // Highlight the selected planet with a circle outline
+    if (selectedPlanet) {
+        // Draw a highlight circle around the selected planet
+        sf::CircleShape highlight;
+        highlight.setRadius(selectedPlanet->getRadius() + 5.0f);  // Slightly larger than planet
+        highlight.setOrigin(highlight.getRadius(), highlight.getRadius());
+        highlight.setPosition(selectedPlanet->getPosition());
+        highlight.setFillColor(sf::Color::Transparent);
+        highlight.setOutlineColor(sf::Color::Yellow);
+        highlight.setOutlineThickness(2.0f);
+        window.draw(highlight);
+    }
+
+    // Restore UI view
+    window.setView(uiView);
 }
 
 
-    void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*>& planets, float deltaTime)
-    {
-        // Store the current vehicle manager
-        activeVehicleManager = vehicleManager;
 
-        // Only update if we have a valid vehicle manager
-        if (!vehicleManager) return;
-
-        // Find nearest planet for planet info display and mass buttons
-        nearestPlanet = findNearestPlanet(vehicleManager, planets);
-
-        // Update UI panels
-        updateRocketInfo(vehicleManager);
-        updatePlanetInfo(vehicleManager, planets);
-        updateOrbitInfo(vehicleManager, planets);
-        updateThrustMetrics(vehicleManager, planets);
-
-        // Update button states - check if mouse is hovering over buttons
-        sf::Vector2i mousePosition = sf::Mouse::getPosition(window);
-        sf::Vector2f mousePosView = window.mapPixelToCoords(mousePosition, uiView);
-
-        increaseMassButton.update(mousePosView);
-        decreaseMassButton.update(mousePosView);
-
-        // Also update the new engine upgrade buttons
-        increaseThrustButton.update(mousePosView);
-        increaseEfficiencyButton.update(mousePosView);
-
-        // Check for button clicks
-        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
-            increaseMassButton.handleClick();
-            decreaseMassButton.handleClick();
-
-            // Also handle clicks for the new buttons
-            increaseThrustButton.handleClick();
-            increaseEfficiencyButton.handleClick();
-        }
-    }
-
-    void UIManager::render()
-    {
-        // Save current view
-        sf::View currentView = window.getView();
-
-        // Apply UI view for interface rendering
-        window.setView(uiView);
-
-        // Draw UI panels
-        rocketInfoPanel.draw(window);
-        planetInfoPanel.draw(window);
-        orbitInfoPanel.draw(window);
-        controlsPanel.draw(window);
-        thrustMetricsPanel.draw(window);
-
-        // Draw multiplayer panel if in multiplayer mode
-        if (isMultiplayer) {
-            multiplayerPanel.draw(window);
-        }
-
-        // Draw planet mass control buttons
-        if (nearestPlanet) {
-            increaseMassButton.draw(window);
-            decreaseMassButton.draw(window);
-
-            // Draw button labels
-            sf::Text plusText(font, "");
-            plusText.setString("fuel --");
-            plusText.setCharacterSize(20);
-            plusText.setFillColor(sf::Color::White);
-            plusText.setPosition(increaseMassButton.getPosition() + sf::Vector2f(10, 3));
-            window.draw(plusText);
-
-            sf::Text minusText(font, "");
-            minusText.setString("fuel ++");
-            minusText.setCharacterSize(20);
-            minusText.setFillColor(sf::Color::White);
-            minusText.setPosition(decreaseMassButton.getPosition() + sf::Vector2f(10, 3));
-            window.draw(minusText);
-        }
-
-        // Draw engine upgrade buttons when in rocket mode
-        if (activeVehicleManager && activeVehicleManager->getActiveVehicleType() == VehicleType::ROCKET) {
-            increaseThrustButton.draw(window);
-            increaseEfficiencyButton.draw(window);
-
-            // Draw button labels
-            sf::Text thrustText(font, "");
-            thrustText.setString("Thrust +");
-            thrustText.setCharacterSize(16);
-            thrustText.setFillColor(sf::Color::White);
-            thrustText.setPosition(increaseThrustButton.getPosition() + sf::Vector2f(10, 7));
-            window.draw(thrustText);
-
-            sf::Text effText(font, "");
-            effText.setString("Fuel Eff +");
-            effText.setCharacterSize(16);
-            effText.setFillColor(sf::Color::White);
-            effText.setPosition(increaseEfficiencyButton.getPosition() + sf::Vector2f(5, 7));
-            window.draw(effText);
-
-            // Show upgrade cost
-            sf::Text costText(font, "");
-            std::stringstream ss;
-            ss << "Cost: " << std::fixed << std::setprecision(2) << upgradeCost;
-            costText.setString(ss.str());
-            costText.setCharacterSize(12);
-            costText.setFillColor(sf::Color::Yellow);
-            costText.setPosition(increaseThrustButton.getPosition() + sf::Vector2f(85, 10));
-            window.draw(costText);
-
-            sf::Text costText2 = costText;
-            costText2.setPosition(increaseEfficiencyButton.getPosition() + sf::Vector2f(85, 10));
-            window.draw(costText2);
-        }
-
-        // Restore previous view
-        window.setView(currentView);
-    }
     void UIManager::updateRocketInfo(VehicleManager* vehicleManager)
     {
         if (!vehicleManager) return;
@@ -310,39 +320,45 @@ Planet* UIManager::findNearestPlanet(VehicleManager* vehicleManager, const std::
 }
 
 
+
 void UIManager::updatePlanetInfo(VehicleManager* vehicleManager, const std::vector<Planet*>& planets)
 {
     if (!vehicleManager || planets.empty()) return;
-    // Find nearest planet - already found in update()
-    Planet* closestPlanet = nearestPlanet;
-    if (!closestPlanet) return;
-    // Calculate distance to nearest planet
+
+    // Use selectedPlanet instead of nearestPlanet
+    Planet* targetPlanet = selectedPlanet;
+    if (!targetPlanet) return;
+
+    // Calculate distance to selected planet
     GameObject* vehicle = vehicleManager->getActiveVehicle();
     if (!vehicle) return;
     float dist = std::sqrt(
-        std::pow(vehicle->getPosition().x - closestPlanet->getPosition().x, 2) +
-        std::pow(vehicle->getPosition().y - closestPlanet->getPosition().y, 2)
+        std::pow(vehicle->getPosition().x - targetPlanet->getPosition().x, 2) +
+        std::pow(vehicle->getPosition().y - targetPlanet->getPosition().y, 2)
     );
 
     // Calculate planet speed
     float planetSpeed = std::sqrt(
-        std::pow(closestPlanet->getVelocity().x, 2) +
-        std::pow(closestPlanet->getVelocity().y, 2)
+        std::pow(targetPlanet->getVelocity().x, 2) +
+        std::pow(targetPlanet->getVelocity().y, 2)
     );
 
     std::stringstream ss;
-    ss << "Nearest Planet Info:\n";
+    ss << "Selected Planet Info:\n";  // Changed text to indicate selection
     ss << "Distance: " << std::fixed << std::setprecision(1) << dist << "\n";
-    ss << "Mass: " << std::fixed << std::setprecision(1) << closestPlanet->getMass() << "\n";
-    ss << "Radius: " << std::fixed << std::setprecision(1) << closestPlanet->getRadius() << "\n";
+    ss << "Mass: " << std::fixed << std::setprecision(1) << targetPlanet->getMass() << "\n";
+    ss << "Radius: " << std::fixed << std::setprecision(1) << targetPlanet->getRadius() << "\n";
     ss << "Speed: " << std::fixed << std::setprecision(1) << planetSpeed << "\n";
     ss << "Surface Gravity: " << std::fixed << std::setprecision(2)
-        << (GameConstants::G * closestPlanet->getMass() /
-            (closestPlanet->getRadius() * closestPlanet->getRadius())) << "\n";
+        << (GameConstants::G * targetPlanet->getMass() /
+            (targetPlanet->getRadius() * targetPlanet->getRadius())) << "\n";
     // Add the mass adjustment hint
     ss << "Click +/- to transfer mass";
+
     planetInfoPanel.setText(ss.str());
 }
+
+
 
 void UIManager::updateOrbitInfo(VehicleManager* vehicleManager, const std::vector<Planet*>& planets)
 {
@@ -352,26 +368,26 @@ void UIManager::updateOrbitInfo(VehicleManager* vehicleManager, const std::vecto
     Rocket* rocket = vehicleManager->getRocket();
     if (!rocket) return;
 
-    // Use the already found nearest planet
-    Planet* closestPlanet = nearestPlanet;
-    if (!closestPlanet) return;
+    // Use the selected planet
+    Planet* targetPlanet = selectedPlanet;
+    if (!targetPlanet) return;
 
     // Get relative position and velocity
-    sf::Vector2f relPos = rocket->getPosition() - closestPlanet->getPosition();
-    sf::Vector2f relVel = rocket->getVelocity() - closestPlanet->getVelocity();
+    sf::Vector2f relPos = rocket->getPosition() - targetPlanet->getPosition();
+    sf::Vector2f relVel = rocket->getVelocity() - targetPlanet->getVelocity();
 
     // Calculate orbital parameters
-    float periapsis = OrbitalMechanics::calculatePeriapsis(relPos, relVel, closestPlanet->getMass(), GameConstants::G);
-    float apoapsis = OrbitalMechanics::calculateApoapsis(relPos, relVel, closestPlanet->getMass(), GameConstants::G);
+    float periapsis = OrbitalMechanics::calculatePeriapsis(relPos, relVel, targetPlanet->getMass(), GameConstants::G);
+    float apoapsis = OrbitalMechanics::calculateApoapsis(relPos, relVel, targetPlanet->getMass(), GameConstants::G);
     float period = OrbitalMechanics::calculateOrbitalPeriod(
-        (periapsis + apoapsis) / 2.0f, closestPlanet->getMass(), GameConstants::G);
-    float eccentricity = OrbitalMechanics::calculateEccentricity(relPos, relVel, closestPlanet->getMass(), GameConstants::G);
+        (periapsis + apoapsis) / 2.0f, targetPlanet->getMass(), GameConstants::G);
+    float eccentricity = OrbitalMechanics::calculateEccentricity(relPos, relVel, targetPlanet->getMass(), GameConstants::G);
 
     std::stringstream ss;
-    ss << "Orbit Info (nearest planet):\n";
+    ss << "Orbit Info (selected planet):\n";  // Updated text
 
     // If we're in a valid orbit
-    if (periapsis > closestPlanet->getRadius() && !std::isnan(periapsis) && !std::isnan(apoapsis) &&
+    if (periapsis > targetPlanet->getRadius() && !std::isnan(periapsis) && !std::isnan(apoapsis) &&
         apoapsis > periapsis && eccentricity < 1.0f) {
         ss << "Periapsis: " << std::fixed << std::setprecision(1) << periapsis << "\n";
         ss << "Apoapsis: " << std::fixed << std::setprecision(1) << apoapsis << "\n";
@@ -390,6 +406,8 @@ void UIManager::updateOrbitInfo(VehicleManager* vehicleManager, const std::vecto
 
     orbitInfoPanel.setText(ss.str());
 }
+
+
 
 void UIManager::updateThrustMetrics(VehicleManager* vehicleManager, const std::vector<Planet*>& planets)
 {
