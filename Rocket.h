@@ -26,6 +26,9 @@ private:
     float thrustMultiplier;     // Multiplier for engine thrust (starts at 1.0)
     float efficiencyMultiplier; // Multiplier for fuel efficiency (starts at 1.0)
 
+
+    bool isThrusting;  // Flag to track when thrust is actually being applied
+
     void updateStoredMassVisual();
     bool checkCollision(const Planet& planet);
 

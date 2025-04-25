@@ -66,6 +66,6 @@ namespace GameConstants {
     constexpr float TRANSFORM_VELOCITY_FACTOR = 0.1f;  // Velocity reduction when transforming from rocket to car
 
     // Fuel constants
-    constexpr float BASE_FUEL_CONSUMPTION_RATE = 0.05f;  // Units of fuel consumed per second at full thrust
-    constexpr float FUEL_EFFICIENCY_MULTIPLIER = 1.0f;   // Higher values mean more efficient engines
+    constexpr float BASE_FUEL_CONSUMPTION_RATE = 0.5f;  // Units of fuel consumed per second at full thrust
+    constexpr float FUEL_EFFICIENCY_MULTIPLIER = 0.01f;   // Higher values mean more efficient engines
 }

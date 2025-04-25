@@ -11,7 +11,8 @@ Rocket::Rocket(sf::Vector2f pos, sf::Vector2f vel, sf::Color col, float m)
     : GameObject(pos, vel, col), rotation(0), angularVelocity(0),
     thrustLevel(0.0f), mass(m), storedMass(0.0f),
     fuelConsumptionRate(GameConstants::BASE_FUEL_CONSUMPTION_RATE),
-    thrustMultiplier(1.0f), efficiencyMultiplier(1.0f)
+    thrustMultiplier(1.0f), efficiencyMultiplier(1.0f),
+    isThrusting(false)  // Initialize the new flag
 {
     try {
         // Create rocket body (a simple triangle)
@@ -77,7 +78,7 @@ bool Rocket::upgradeThrust(float massCost) {
     mass = 1.0f + storedMass; // Update total mass
 
     // Increase thrust multiplier by 10%
-    thrustMultiplier += 0.1f;
+    thrustMultiplier += 0.001f;
 
     // Update visual representation
     updateStoredMassVisual();
@@ -138,17 +139,13 @@ Planet* Rocket::dropStoredMass() {
 }
 
 void Rocket::consumeFuel(float deltaTime) {
-    // Only consume fuel if thrusting AND thrust is actually being applied
-    // This requires passing in an "isThrusting" parameter or tracking it in the Rocket class
-    static bool isThrusting = false;
-
-    // Get current thrust input state
-    bool currentThrusting = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up);
-
-    // Only consume fuel when actively applying thrust with keys
-    if (thrustLevel > 0.0f && currentThrusting) {
-        // Calculate mass to consume based on thrust level and time
-        float consumedMass = fuelConsumptionRate * thrustLevel * deltaTime;
+    // Only consume fuel when thrust is actually being applied AND thrust level is positive
+    if (isThrusting && thrustLevel > 0.0f && storedMass > 0.0f) {
+        // Calculate mass to consume based on thrust level squared (for more dramatic effect)
+        // Higher thrust levels will consume disproportionately more fuel
+        // The efficiency multiplier reduces the consumption rate
+        float thrustFactor = thrustLevel * thrustLevel; // Square the thrust level for more dramatic scaling
+        float consumedMass = (fuelConsumptionRate * thrustFactor * deltaTime) / efficiencyMultiplier;
 
         // Don't consume more than we have
         consumedMass = std::min(consumedMass, storedMass);
@@ -161,9 +158,10 @@ void Rocket::consumeFuel(float deltaTime) {
         updateStoredMassVisual();
     }
 
-    // Store current thrust state for next frame
-    isThrusting = currentThrusting;
+    // Reset the thrusting flag after consumption is calculated
+    isThrusting = false;
 }
+
 
 bool Rocket::hasFuel() const {
     return storedMass > 0.0f;
@@ -199,8 +197,12 @@ void Rocket::addPart(std::unique_ptr<RocketPart> part)
     }
 }
 
+
 void Rocket::applyThrust(float amount)
 {
+    // Set the thrusting flag based on the amount
+    isThrusting = (amount != 0.0f);
+
     // Only apply thrust if we have fuel or if braking (negative thrust)
     if (hasFuel() || amount < 0) {
         // Calculate thrust direction based on rocket rotation
@@ -214,6 +216,7 @@ void Rocket::applyThrust(float amount)
         velocity += thrustDir * amount * thrustLevel * thrustMultiplier / mass;
     }
 }
+
 
 void Rocket::rotate(float amount)
 {
