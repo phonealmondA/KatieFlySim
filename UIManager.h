@@ -26,6 +26,13 @@ private:
     Planet* nearestPlanet;
     VehicleManager* activeVehicleManager;
 
+
+
+
+    Button increaseThrustButton;
+    Button increaseEfficiencyButton;
+    const float upgradeCost = 0.1f; // Base cost for upgrades
+
     bool isMultiplayer;
     bool isHost;
 

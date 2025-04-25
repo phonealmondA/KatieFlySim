@@ -10,7 +10,8 @@
 Rocket::Rocket(sf::Vector2f pos, sf::Vector2f vel, sf::Color col, float m)
     : GameObject(pos, vel, col), rotation(0), angularVelocity(0),
     thrustLevel(0.0f), mass(m), storedMass(0.0f),
-    fuelConsumptionRate(GameConstants::BASE_FUEL_CONSUMPTION_RATE)
+    fuelConsumptionRate(GameConstants::BASE_FUEL_CONSUMPTION_RATE),
+    thrustMultiplier(1.0f), efficiencyMultiplier(1.0f)
 {
     try {
         // Create rocket body (a simple triangle)
@@ -35,8 +36,6 @@ Rocket::Rocket(sf::Vector2f pos, sf::Vector2f vel, sf::Color col, float m)
     }
 }
 
-
-
 void Rocket::updateStoredMassVisual() {
     // Size based on stored mass (with minimum size)
     float radius = std::max(5.0f, std::sqrt(storedMass) * 3.0f);
@@ -50,9 +49,6 @@ void Rocket::updateStoredMassVisual() {
     sf::Vector2f offset(std::sin(radians), -std::cos(radians));
     storedMassVisual.setPosition(position + offset * offsetDistance);
 }
-
-
-
 
 void Rocket::addStoredMass(float amount) {
     // Add to stored mass
@@ -68,6 +64,47 @@ void Rocket::addStoredMass(float amount) {
 
     // Update visual representation
     updateStoredMassVisual();
+}
+
+bool Rocket::upgradeThrust(float massCost) {
+    // Check if we have enough stored mass
+    if (storedMass < massCost) {
+        return false;
+    }
+
+    // Spend the mass
+    storedMass -= massCost;
+    mass = 1.0f + storedMass; // Update total mass
+
+    // Increase thrust multiplier by 10%
+    thrustMultiplier += 0.1f;
+
+    // Update visual representation
+    updateStoredMassVisual();
+
+    return true;
+}
+
+bool Rocket::upgradeEfficiency(float massCost) {
+    // Check if we have enough stored mass
+    if (storedMass < massCost) {
+        return false;
+    }
+
+    // Spend the mass
+    storedMass -= massCost;
+    mass = 1.0f + storedMass; // Update total mass
+
+    // Increase efficiency multiplier by 10%
+    efficiencyMultiplier += 0.1f;
+
+    // Update fuel consumption rate based on efficiency
+    fuelConsumptionRate = GameConstants::BASE_FUEL_CONSUMPTION_RATE / efficiencyMultiplier;
+
+    // Update visual representation
+    updateStoredMassVisual();
+
+    return true;
 }
 
 Planet* Rocket::dropStoredMass() {
@@ -173,8 +210,8 @@ void Rocket::applyThrust(float amount)
         // So we need to use -sin for x and -cos for y to get the direction
         sf::Vector2f thrustDir(std::sin(radians), -std::cos(radians));
 
-        // Apply force and convert to acceleration by dividing by mass (F=ma -> a=F/m)
-        velocity += thrustDir * amount * thrustLevel / mass;
+        // Apply force with thrust multiplier
+        velocity += thrustDir * amount * thrustLevel * thrustMultiplier / mass;
     }
 }
 

@@ -22,6 +22,10 @@ private:
     float fuelConsumptionRate; // Mass consumed per second at full thrust
     sf::CircleShape storedMassVisual; // Visual representation of stored mass
 
+
+    float thrustMultiplier;     // Multiplier for engine thrust (starts at 1.0)
+    float efficiencyMultiplier; // Multiplier for fuel efficiency (starts at 1.0)
+
     void updateStoredMassVisual();
     bool checkCollision(const Planet& planet);
 
@@ -71,6 +75,16 @@ public:
     const std::vector<std::unique_ptr<RocketPart>>& getParts() const { return parts; }
     float getRotation() const { return rotation; }
     void setRotation(float rot) { rotation = rot; }
+
+
+
+    // Engine upgrade methods
+    bool upgradeThrust(float massCost);
+    bool upgradeEfficiency(float massCost);
+
+    // Getters for upgrade values
+    float getThrustMultiplier() const { return thrustMultiplier; }
+    float getEfficiencyMultiplier() const { return efficiencyMultiplier; }
 
     void setColor(sf::Color col) { color = col; }
     sf::Color getColor() const { return color; }
