@@ -202,8 +202,7 @@ void UIManager::updateRocketInfo(VehicleManager* vehicleManager)
     rocketInfoPanel.setText(ss.str());
 }
 
-Planet* UIManager::findNearestPlanet(VehicleManager* vehicleManager, const std::vector<Planet*>& planets)
-{
+Planet* UIManager::findNearestPlanet(VehicleManager* vehicleManager, const std::vector<Planet*>& planets) {
     if (!vehicleManager || planets.empty()) return nullptr;
 
     GameObject* vehicle = vehicleManager->getActiveVehicle();
@@ -220,6 +219,7 @@ Planet* UIManager::findNearestPlanet(VehicleManager* vehicleManager, const std::
             std::pow(vehicle->getPosition().y - planet->getPosition().y, 2)
         );
 
+        // Find the actual closest planet, regardless of size
         if (dist < closestDistance) {
             closestDistance = dist;
             closest = planet;
@@ -228,6 +228,7 @@ Planet* UIManager::findNearestPlanet(VehicleManager* vehicleManager, const std::
 
     return closest;
 }
+
 
 void UIManager::updatePlanetInfo(VehicleManager* vehicleManager, const std::vector<Planet*>& planets)
 {

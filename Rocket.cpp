@@ -75,8 +75,8 @@ Planet* Rocket::dropStoredMass() {
     // Create a new planet with the stored mass
     Planet* newPlanet = new Planet(planetPos, 0, storedMass, sf::Color(100, 200, 255));
 
-    // Give it the rocket's velocity
-    newPlanet->setVelocity(velocity);
+    // Give it the rocket's velocity plus a small offset to prevent immediate collisions
+    newPlanet->setVelocity(velocity + offset * 10.0f);
 
     // Reset stored mass
     storedMass = 0.0f;

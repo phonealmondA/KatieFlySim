@@ -76,6 +76,13 @@ void Planet::drawVelocityVector(sf::RenderWindow& window, float scale)
     window.draw(line);
 }
 
+
+void Planet::setNearbyPlanets(const std::vector<Planet*>& planets) {
+    // This method creates a reference to nearby planets for trajectory calculation
+    // We don't actually need to store them since drawOrbitPath takes the planets vector directly
+    // This is just to maintain API consistency with Rocket class
+}
+
 void Planet::drawOrbitPath(sf::RenderWindow& window, const std::vector<Planet*>& planets,
     float timeStep, int steps)
 {

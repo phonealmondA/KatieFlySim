@@ -17,6 +17,7 @@ public:
 
     // Add to Planet.h public section
 
+    void setNearbyPlanets(const std::vector<Planet*>& planets);
 
     float getMass() const;
     float getRadius() const;
