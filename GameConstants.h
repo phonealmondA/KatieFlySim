@@ -8,17 +8,17 @@ namespace GameConstants {
 
     // Mass-radius relationship constants
     constexpr float BASE_RADIUS_FACTOR = 100.0f;  // Base size factor for planets
-    constexpr float REFERENCE_MASS = 10000.0f;  // Reference mass for radius scaling
+    constexpr float REFERENCE_MASS = 50000.0f;  // Reference mass for radius scaling
 
     // Primary inputs
-    constexpr float MAIN_PLANET_MASS = 100000.0f;  // Primary parameter to adjust
+    constexpr float MAIN_PLANET_MASS = 50000.0f;  // Primary parameter to adjust
     constexpr float ORBIT_PERIOD = 420.0f;  // Desired orbit period in seconds
 
     // Derived parameters
     constexpr float SECONDARY_PLANET_MASS = MAIN_PLANET_MASS * 0.06f;  // 8% of main planet mass
 
     // Fixed radius values (not using functions that would cause constexpr issues)
-    constexpr float MAIN_PLANET_RADIUS = 10000.0f;  // Base radius at this mass
+    constexpr float MAIN_PLANET_RADIUS = 100000.0f;  // Base radius at this mass
     constexpr float MASS_RATIO = 0.06f;  // Same as SECONDARY_PLANET_MASS / MAIN_PLANET_MASS
     constexpr float CUBE_ROOT_APPROX = 60.0f;  // Approximate cube root of 0.08
     constexpr float SECONDARY_PLANET_RADIUS = (MAIN_PLANET_RADIUS / CUBE_ROOT_APPROX) / 10000;  // ~430

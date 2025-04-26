@@ -32,7 +32,7 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
                 Rocket* rocket = activeVehicleManager->getRocket();
                 if (rocket && rocket->getStoredMass() > 0.0f) {
                     // Transfer 0.01 units of mass from rocket to planet
-                    float massToTransfer = 0.01f;
+                    float massToTransfer = 0.05f;
                     rocket->addStoredMass(-massToTransfer); // Remove from rocket
                     selectedPlanet->setMass(selectedPlanet->getMass() + massToTransfer); // Add to planet
                 }
@@ -49,7 +49,7 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
                 Rocket* rocket = activeVehicleManager->getRocket();
                 if (rocket && selectedPlanet->getMass() > 1.0f) { // Don't let planet go below 1 mass
                     // Transfer 0.01 units of mass from planet to rocket
-                    float massToTransfer = 0.01f;
+                    float massToTransfer = 0.05f;
                     selectedPlanet->setMass(selectedPlanet->getMass() - massToTransfer); // Remove from planet
                     rocket->addStoredMass(massToTransfer); // Add to rocket
                 }
@@ -126,7 +126,7 @@ void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*
     updatePlanetInfo(vehicleManager, planets);
     updateOrbitInfo(vehicleManager, planets);
     updateThrustMetrics(vehicleManager, planets);
-
+    updateControlsInfo();
     // Update button states - check if mouse is hovering over buttons
     sf::Vector2i mousePosition = sf::Mouse::getPosition(window);
     sf::Vector2f mousePosView = window.mapPixelToCoords(mousePosition, uiView);
@@ -148,6 +148,12 @@ void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*
         increaseEfficiencyButton.handleClick();
     }
 }
+
+
+
+
+
+
 
 void UIManager::render()
 {
@@ -410,7 +416,20 @@ void UIManager::updateOrbitInfo(VehicleManager* vehicleManager, const std::vecto
     orbitInfoPanel.setText(ss.str());
 }
 
+void UIManager::updateControlsInfo()
+{
+    std::stringstream ss;
+    ss << "Controls:\n";
+    ss << "Arrow Keys: Move rocket\n";
+    ss << "0-9: Set thrust level (0-90%)\n";
+    ss << "=: Set thrust to 100%\n";
+    ss << "L: Transform to/from car\n";
+    ss << "Tab: Cycle selected planet\n";
+    ss << "-: Drop stored mass as planet\n";
+    ss << "Z/X: Zoom out/auto-zoom";
 
+    controlsPanel.setText(ss.str());
+}
 
 void UIManager::updateThrustMetrics(VehicleManager* vehicleManager, const std::vector<Planet*>& planets)
 {

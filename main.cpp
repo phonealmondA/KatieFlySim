@@ -26,6 +26,12 @@
 #include <windows.h>
 #endif
 
+// Safety function to check pointer validity
+template<typename T>
+bool isValidPtr(T* ptr) {
+    return ptr != nullptr;
+}
+
 // Parse command line arguments for multiplayer setup
 bool parseCommandLine(int argc, char* argv[], bool& isMultiplayer, bool& isHost,
     std::string& address, unsigned short& port) {
@@ -55,7 +61,6 @@ bool parseCommandLine(int argc, char* argv[], bool& isMultiplayer, bool& isHost,
 
     return false;
 }
-
 
 int main(int argc, char* argv[])
 {
@@ -163,51 +168,122 @@ int main(int argc, char* argv[])
     }
     window.setTitle(windowTitle);
 
-    // Initialize network system if multiplayer
-    NetworkWrapper networkWrapper;
-
-    if (isMultiplayer) {
-        if (!networkWrapper.initialize(isHost, address, port)) {
-            std::cerr << "Failed to initialize network. Exiting." << std::endl;
-            return 1;
-        }
-
-        std::cout << "Network connection established. Running in "
-            << (isHost ? "server" : "client") << " mode." << std::endl;
-    }
-
-    // Initialize game manager
+    // Initialize single player components first in all cases
     GameManager gameManager(window);
     UIManager uiManager(window, font, gameManager.getUIView(), isMultiplayer, isHost);
     gameManager.setUIManager(&uiManager);
 
-    // For multiplayer, we'll need to connect to the network components
+    // For single player mode, initialize the game manager
+    if (!isMultiplayer) {
+        gameManager.initialize();
+    }
+
+    // Create pointers for game components
     VehicleManager* activeVehicleManager = nullptr;
     std::vector<Planet*> planets;
+    NetworkWrapper networkWrapper;
 
+    // Initialize multiplayer if needed
     if (isMultiplayer) {
-        if (isHost) {
-            // Server mode - use GameServer's objects
-            GameServer* gameServer = networkWrapper.getServer();
-            planets = gameServer->getPlanets();
-            activeVehicleManager = gameServer->getPlayer(0);
+        std::cout << "Initializing network in " << (isHost ? "host" : "client") << " mode..." << std::endl;
+        try {
+            if (!networkWrapper.initialize(isHost, address, port)) {
+                std::cerr << "Failed to initialize network. Falling back to single player mode." << std::endl;
+                isMultiplayer = false;
+                isHost = false;
+                gameManager.initialize();
+                activeVehicleManager = gameManager.getActiveVehicleManager();
+                planets = gameManager.getPlanets();
+            }
+            else {
+                std::cout << "Network connection established." << std::endl;
+
+                // Setup multiplayer components based on role
+                if (isHost) {
+                    // Server mode - use GameServer's objects
+                    GameServer* gameServer = networkWrapper.getServer();
+                    if (gameServer) {
+                        planets = gameServer->getPlanets();
+                        activeVehicleManager = gameServer->getPlayer(0);
+
+                        if (planets.empty() || !activeVehicleManager) {
+                            std::cerr << "Warning: Invalid game objects in host mode." << std::endl;
+                            // Fall back to safe values if needed
+                            if (planets.empty() && gameServer->getPlanets().empty()) {
+                                std::cerr << "Initializing planets for server" << std::endl;
+                                gameServer->initialize();
+                                planets = gameServer->getPlanets();
+                            }
+
+                            if (!activeVehicleManager) {
+                                std::cerr << "Creating player for server" << std::endl;
+                                if (!planets.empty()) {
+                                    sf::Vector2f initialPos = planets[0]->getPosition() +
+                                        sf::Vector2f(0, -(planets[0]->getRadius() + 50.0f));
+                                    gameServer->addPlayer(0, initialPos);
+                                    activeVehicleManager = gameServer->getPlayer(0);
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        std::cerr << "GameServer is null. Falling back to single player." << std::endl;
+                        isMultiplayer = false;
+                        gameManager.initialize();
+                        activeVehicleManager = gameManager.getActiveVehicleManager();
+                        planets = gameManager.getPlanets();
+                    }
+                }
+                else {
+                    // Client mode - use GameClient's objects
+                    GameClient* gameClient = networkWrapper.getClient();
+                    if (gameClient) {
+                        planets = gameClient->getPlanets();
+                        activeVehicleManager = gameClient->getLocalPlayer();
+
+                        if (planets.empty()) {
+                            std::cerr << "Warning: Client has no planets yet." << std::endl;
+                        }
+
+                        if (!activeVehicleManager) {
+                            std::cerr << "Warning: Client has no vehicle manager yet." << std::endl;
+                        }
+                    }
+                    else {
+                        std::cerr << "GameClient is null. Falling back to single player." << std::endl;
+                        isMultiplayer = false;
+                        gameManager.initialize();
+                        activeVehicleManager = gameManager.getActiveVehicleManager();
+                        planets = gameManager.getPlanets();
+                    }
+                }
+            }
         }
-        else {
-            // Client mode - use GameClient's objects
-            GameClient* gameClient = networkWrapper.getClient();
-            planets = gameClient->getPlanets();
-            activeVehicleManager = gameClient->getLocalPlayer();
+        catch (const std::exception& e) {
+            std::cerr << "Exception during network initialization: " << e.what() << std::endl;
+            std::cerr << "Falling back to single player mode." << std::endl;
+            isMultiplayer = false;
+            isHost = false;
+            gameManager.initialize();
+            activeVehicleManager = gameManager.getActiveVehicleManager();
+            planets = gameManager.getPlanets();
         }
     }
     else {
-        // Single player mode - initialize game manager
-        gameManager.initialize();
+        // Single player mode - get objects from game manager
         activeVehicleManager = gameManager.getActiveVehicleManager();
         planets = gameManager.getPlanets();
     }
 
-    // Initialize UI manager
-    //UIManager uiManager(window, font, gameManager.getUIView(), isMultiplayer, isHost);
+    // Final safety check - if we still don't have valid objects, initialize single player
+    if (!activeVehicleManager || planets.empty()) {
+        std::cerr << "Failed to initialize game objects. Falling back to single player." << std::endl;
+        isMultiplayer = false;
+        isHost = false;
+        gameManager.initialize();
+        activeVehicleManager = gameManager.getActiveVehicleManager();
+        planets = gameManager.getPlanets();
+    }
 
     // Initialize input manager
     InputManager inputManager(isMultiplayer, isHost);
@@ -219,61 +295,136 @@ int main(int argc, char* argv[])
     while (window.isOpen())
     {
         // Calculate delta time (limit to avoid physics issues)
-        float deltaTime = clock.restart().asSeconds();
+        float deltaTime = std::min(clock.restart().asSeconds(), 0.1f);
 
         // Update network if multiplayer
         if (isMultiplayer) {
-            networkWrapper.update(deltaTime);
+            try {
+                networkWrapper.update(deltaTime);
 
-            // Update multiplayer info in UI
-            if (isHost) {
-                GameServer* gameServer = networkWrapper.getServer();
-                uiManager.updateMultiplayerInfo(
-                    gameServer ? gameServer->getPlayers().size() - 1 : 0,
-                    networkWrapper.getNetworkManager()->isConnected(),
-                    0,
-                    networkWrapper.getNetworkManager()->getPing());
+                // Update multiplayer info in UI
+                if (isHost) {
+                    GameServer* gameServer = networkWrapper.getServer();
+                    if (gameServer) {
+                        uiManager.updateMultiplayerInfo(
+                            gameServer->getPlayers().size() - 1,
+                            networkWrapper.getNetworkManager()->isConnected(),
+                            0,
+                            networkWrapper.getNetworkManager()->getPing());
+                    }
+                    else {
+                        uiManager.updateMultiplayerInfo(
+                            0,
+                            false,
+                            0,
+                            0);
+                    }
+                }
+                else {
+                    GameClient* gameClient = networkWrapper.getClient();
+                    if (gameClient) {
+                        uiManager.updateMultiplayerInfo(
+                            gameClient->getRemotePlayers().size(),
+                            networkWrapper.getNetworkManager()->isConnected(),
+                            gameClient->getLocalPlayerId(),
+                            networkWrapper.getNetworkManager()->getPing());
+                    }
+                    else {
+                        uiManager.updateMultiplayerInfo(
+                            0,
+                            false,
+                            0,
+                            0);
+                    }
+                }
             }
-            else {
-                GameClient* gameClient = networkWrapper.getClient();
-                uiManager.updateMultiplayerInfo(
-                    gameClient->getRemotePlayers().size(),
-                    networkWrapper.getNetworkManager()->isConnected(),
-                    gameClient->getLocalPlayerId(),
-                    networkWrapper.getNetworkManager()->getPing());
+            catch (const std::exception& e) {
+                std::cerr << "Exception in network update: " << e.what() << std::endl;
             }
         }
 
-        // Handle events (window events, keyboard, etc.)
-        gameManager.handleEvents();
+        // Make sure we have a vehicle manager
+        if (!activeVehicleManager) {
+            std::cerr << "Vehicle manager is null. Getting new vehicle manager." << std::endl;
+            if (isMultiplayer && isHost) {
+                GameServer* gameServer = networkWrapper.getServer();
+                if (gameServer) {
+                    activeVehicleManager = gameServer->getPlayer(0);
+                }
+            }
+            else if (isMultiplayer && !isHost) {
+                GameClient* gameClient = networkWrapper.getClient();
+                if (gameClient) {
+                    activeVehicleManager = gameClient->getLocalPlayer();
+                }
+            }
+            else {
+                activeVehicleManager = gameManager.getActiveVehicleManager();
+            }
+
+            if (!activeVehicleManager) {
+                std::cerr << "Still couldn't get vehicle manager. Exiting game loop." << std::endl;
+                break;
+            }
+        }
+
+        // Handle events
+        try {
+            gameManager.handleEvents();
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Exception in event handling: " << e.what() << std::endl;
+        }
 
         // Process input for controlling the vehicle
         if (!isMultiplayer || isHost) {
-            inputManager.processInput(activeVehicleManager, deltaTime);
-
-            //planets = gameManager.getPlanets();
+            try {
+                inputManager.processInput(activeVehicleManager, deltaTime);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception in input processing: " << e.what() << std::endl;
+            }
         }
 
         // Update game simulation
         if (!isMultiplayer || isHost) {
-            gameManager.update(deltaTime);
-
-            planets = gameManager.getPlanets();
+            try {
+                gameManager.update(deltaTime);
+                planets = gameManager.getPlanets();
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception in game update: " << e.what() << std::endl;
+            }
         }
 
         // Update UI information
-        uiManager.update(activeVehicleManager, planets, deltaTime);
+        try {
+            uiManager.update(activeVehicleManager, planets, deltaTime);
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Exception in UI update: " << e.what() << std::endl;
+        }
 
         // Render scene
-        gameManager.render();
+        try {
+            gameManager.render();
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Exception in rendering: " << e.what() << std::endl;
+        }
 
         // Render UI
-        uiManager.render();
+        try {
+            uiManager.render();
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Exception in UI rendering: " << e.what() << std::endl;
+        }
 
         // Display the frame
         window.display();
     }
 
-    // Cleanup happens automatically via destructors for our manager classes
+    // Cleanup happens automatically via destructors
     return 0;
 }

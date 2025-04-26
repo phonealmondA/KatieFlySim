@@ -28,16 +28,14 @@ MenuSystem::MenuSystem(sf::RenderWindow& window, sf::Font& font)
     ));
 
     // In MenuSystem.cpp, modify the button initialization in the constructor:
-
     menuButtons.push_back(Button(
         sf::Vector2f(640.f - 100.f, 370.f),
         sf::Vector2f(200.f, 50.f),
         "Host",
         font,
-        [this, &window]() {
-            launchHostProcess();
-            // The window should close after launching the host process
-            window.close();
+        [this]() {
+            // Change state to MULTIPLAYER_HOST instead of launching process
+            currentState = MenuGameState::MULTIPLAYER_HOST;
         }
     ));
 
@@ -66,46 +64,19 @@ MenuSystem::MenuSystem(sf::RenderWindow& window, sf::Font& font)
         [this]() { currentState = MenuGameState::MENU; }
     ));
 }
+
+
 void MenuSystem::launchHostProcess() {
-    // Get the path to the current executable
-    char buffer[MAX_PATH];
-    GetModuleFileNameA(NULL, buffer, MAX_PATH);
-    std::string exePath = buffer;
+    // Instead of launching a new process, just set the state to host mode
+    currentState = MenuGameState::MULTIPLAYER_HOST;
 
-    // Replace all backslashes with forward slashes to avoid escaping issues
-    for (size_t i = 0; i < exePath.length(); ++i) {
-        if (exePath[i] == '\\') {
-            exePath[i] = '/';
-        }
-    }
+    // Print debug info (you can keep this from the original function)
+    std::cout << "Starting host mode from menu" << std::endl;
 
-    // Prepare the command line
-    std::string cmdLine = "\"" + exePath + "\" --host 5000";
-
-    std::cout << "Launching host with command: " << cmdLine << std::endl;
-
-    // Use Windows API to launch the process
-    STARTUPINFOA si;
-    PROCESS_INFORMATION pi;
-
-    ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    ZeroMemory(&pi, sizeof(pi));
-
-    // Start the process
-    if (CreateProcessA(NULL, const_cast<LPSTR>(cmdLine.c_str()), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-        // Close process and thread handles
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-
-        // Close the current window
-        window.close();
-    }
-    else {
-        // Process creation failed
-        std::cerr << "Failed to start host process. Error: " << GetLastError() << std::endl;
-    }
+    // No need to close the window or create a new process
+    // The main function will handle initializing the server components
 }
+
 
 MenuGameState MenuSystem::run()
 {
