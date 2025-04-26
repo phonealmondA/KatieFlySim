@@ -7,18 +7,18 @@ MenuSystem::MenuSystem(sf::RenderWindow& window, sf::Font& font)
     : window(window),
     currentState(MenuGameState::MENU),
     font(font),
-    titleText(font), // Initialize with font
+    titleText(font),
     inputAddress(""),
     inputPort("5000"),
     focusAddress(true)
 {
     // Initialize title text
-    titleText.setString("Katie's Flight Sim");
+    titleText.setString("Noah's Flight Sim");
     titleText.setCharacterSize(48);
     titleText.setFillColor(sf::Color::White);
     titleText.setPosition(sf::Vector2f(640.f - titleText.getLocalBounds().size.x / 2, 150.f));
 
-    // Initialize menu buttons
+    // Initialize menu buttons - ONLY include Single Player and Join
     menuButtons.push_back(Button(
         sf::Vector2f(640.f - 100.f, 300.f),
         sf::Vector2f(200.f, 50.f),
@@ -27,20 +27,8 @@ MenuSystem::MenuSystem(sf::RenderWindow& window, sf::Font& font)
         [this]() { currentState = MenuGameState::SINGLE_PLAYER; }
     ));
 
-    // In MenuSystem.cpp, modify the button initialization in the constructor:
     menuButtons.push_back(Button(
         sf::Vector2f(640.f - 100.f, 370.f),
-        sf::Vector2f(200.f, 50.f),
-        "Host",
-        font,
-        [this]() {
-            // Change state to MULTIPLAYER_HOST instead of launching process
-            currentState = MenuGameState::MULTIPLAYER_HOST;
-        }
-    ));
-
-    menuButtons.push_back(Button(
-        sf::Vector2f(640.f - 100.f, 440.f),
         sf::Vector2f(200.f, 50.f),
         "Join",
         font,
@@ -64,7 +52,6 @@ MenuSystem::MenuSystem(sf::RenderWindow& window, sf::Font& font)
         [this]() { currentState = MenuGameState::MENU; }
     ));
 }
-
 
 void MenuSystem::launchHostProcess() {
     // Instead of launching a new process, just set the state to host mode
@@ -237,7 +224,6 @@ void MenuSystem::update(float deltaTime)
 }
 
 
-
 void MenuSystem::render()
 {
     window.clear(sf::Color(20, 20, 50));  // Dark blue background
@@ -260,17 +246,23 @@ void MenuSystem::render()
 
             // Set text content based on button index
             if (i == 0) buttonText.setString("Start");
-            else if (i == 1) buttonText.setString("Host");
-            else if (i == 2) buttonText.setString("Join");
+            else if (i == 1) buttonText.setString("Join");
 
             // Place text at hardcoded positions matching the buttons
             if (i == 0) buttonText.setPosition(sf::Vector2f(590.f, 315.f));
             else if (i == 1) buttonText.setPosition(sf::Vector2f(590.f, 385.f));
-            else if (i == 2) buttonText.setPosition(sf::Vector2f(590.f, 455.f));
 
             // Draw the text
             window.draw(buttonText);
         }
+
+        // Add text to inform about command-line hosting
+        sf::Text hostInfoText(font);
+        hostInfoText.setString("To host a game, use --host command line parameter");
+        hostInfoText.setCharacterSize(16);
+        hostInfoText.setFillColor(sf::Color::Yellow);
+        hostInfoText.setPosition(sf::Vector2f(440.f, 450.f));
+        window.draw(hostInfoText);
     }
     else if (currentState == MenuGameState::JOIN_MENU)
     {
