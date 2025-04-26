@@ -34,21 +34,62 @@ void GameManager::initialize()
     zoomLevel = 1.0f;
     targetZoom = 1.0f;
 
-    // Create planets in single player mode
-    Planet* planet = new Planet(sf::Vector2f(GameConstants::MAIN_PLANET_X, GameConstants::MAIN_PLANET_Y),
-        0, GameConstants::MAIN_PLANET_MASS, sf::Color::Blue);
-    planet->setVelocity(sf::Vector2f(0.f, 0.f));
+    // Create main planet (sun)
+    Planet* mainPlanet = new Planet(sf::Vector2f(GameConstants::MAIN_PLANET_X, GameConstants::MAIN_PLANET_Y),
+        0, GameConstants::MAIN_PLANET_MASS, sf::Color::Yellow);
+    mainPlanet->setVelocity(sf::Vector2f(0.f, 0.f));
+    planets.push_back(mainPlanet);
 
-    Planet* planet2 = new Planet(sf::Vector2f(GameConstants::SECONDARY_PLANET_X, GameConstants::SECONDARY_PLANET_Y),
-        0, GameConstants::SECONDARY_PLANET_MASS, sf::Color::Green);
-    planet2->setVelocity(sf::Vector2f(0.f, GameConstants::SECONDARY_PLANET_ORBITAL_VELOCITY));
+    // Create 9 orbiting planets with increasing sizes as they get further from the sun
+    const sf::Color planetColors[] = {
+        sf::Color(150, 150, 150),   // Mercury (gray)
+        sf::Color(255, 190, 120),   // Venus (light orange)
+        sf::Color(0, 100, 255),     // Earth (blue)
+        sf::Color(255, 100, 0),     // Mars (red)
+        sf::Color(255, 200, 100),   // Jupiter (light orange)
+        sf::Color(230, 180, 80),    // Saturn (tan)
+        sf::Color(180, 230, 230),   // Uranus (light blue)
+        sf::Color(100, 130, 255),   // Neptune (dark blue)
+        sf::Color(230, 230, 230)    // Pluto (light gray)
+    };
 
-    planets.push_back(planet);
-    planets.push_back(planet2);
+    // Distance scaling factors - maintain different orbital distances
+    const float distanceScalings[] = { 0.4f, 0.7f, 1.0f, 1.5f, 2.2f, 3.0f, 4.0f, 5.0f, 6.0f };
+
+    // Mass scaling factors - now increasing with distance (smaller planets closer to sun)
+    const float massScalings[] = { 0.1f, 0.2f, 0.3f, 0.5f, 0.8f, 1.2f, 1.8f, 2.5f, 3.5f };
+
+    // Create each planet
+    for (int i = 0; i < 9; i++) {
+        float orbitDistance = GameConstants::PLANET_ORBIT_DISTANCE * distanceScalings[i];
+        float angle = (i * 40.0f) * (3.14159f / 180.0f); // Distribute planets around the sun
+
+        // Calculate position based on orbit distance and angle
+        float planetX = mainPlanet->getPosition().x + orbitDistance * cos(angle);
+        float planetY = mainPlanet->getPosition().y + orbitDistance * sin(angle);
+
+        // Calculate orbital velocity for a stable circular orbit
+        float orbitalVelocity = std::sqrt(GameConstants::G * mainPlanet->getMass() / orbitDistance);
+
+        // Velocity is perpendicular to position vector
+        float velocityX = -sin(angle) * orbitalVelocity;
+        float velocityY = cos(angle) * orbitalVelocity;
+
+        // Create the planet with scaled mass - using the base secondary planet mass
+        // multiplied by our scaling factor
+        float planetMass = GameConstants::SECONDARY_PLANET_MASS * massScalings[i];
+
+        Planet* planet = new Planet(
+            sf::Vector2f(planetX, planetY),
+            0, planetMass, planetColors[i]);
+
+        planet->setVelocity(sf::Vector2f(velocityX, velocityY));
+        planets.push_back(planet);
+    }
 
     // Calculate position for rocket - start at the top of the first planet
-    sf::Vector2f planetPos = planet->getPosition();
-    float planetRadius = planet->getRadius();
+    sf::Vector2f planetPos = mainPlanet->getPosition();
+    float planetRadius = mainPlanet->getRadius();
     sf::Vector2f direction(0, -1);
     sf::Vector2f rocketPos = planetPos + direction * (planetRadius + GameConstants::ROCKET_SIZE);
 
@@ -62,7 +103,6 @@ void GameManager::initialize()
     }
     gravitySimulator.addVehicleManager(activeVehicleManager);
 }
-
 
 void GameManager::update(float deltaTime)
 {

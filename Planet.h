@@ -30,6 +30,6 @@ public:
     void drawVelocityVector(sf::RenderWindow& window, float scale = 1.0f);
 
     // Draw predicted orbit path
-    void drawOrbitPath(sf::RenderWindow& window, const std::vector<Planet*>& planets, float timeStep = 0.5f, int steps = 200);
+    void drawOrbitPath(sf::RenderWindow& window, const std::vector<Planet*>& planets, float timeStep = 0.5f, int steps = 2000);
 
 };
