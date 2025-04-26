@@ -41,7 +41,8 @@ public:
 
     void update(VehicleManager* vehicleManager, const std::vector<Planet*>& planets, float deltaTime);
     void render();
-
+    // Add this to UIManager.h in the public section:
+    Planet* getSelectedPlanet() const { return selectedPlanet; }
     // Update specific panels
     void updateRocketInfo(VehicleManager* vehicleManager);
     void updatePlanetInfo(VehicleManager* vehicleManager, const std::vector<Planet*>& planets);

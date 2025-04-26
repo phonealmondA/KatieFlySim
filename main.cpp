@@ -250,11 +250,15 @@ int main(int argc, char* argv[])
         // Process input for controlling the vehicle
         if (!isMultiplayer || isHost) {
             inputManager.processInput(activeVehicleManager, deltaTime);
+
+            //planets = gameManager.getPlanets();
         }
 
         // Update game simulation
         if (!isMultiplayer || isHost) {
             gameManager.update(deltaTime);
+
+            planets = gameManager.getPlanets();
         }
 
         // Update UI information

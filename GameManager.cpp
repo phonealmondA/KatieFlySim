@@ -3,6 +3,7 @@
 #include "TextPanel.h"
 #include "OrbitalMechanics.h"
 #include "GameConstants.h"
+#include "UIManager.h"  // Add this include
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -100,7 +101,6 @@ void GameManager::updateCamera(float deltaTime)
     const float minZoom = 1.0f;
     const float maxZoom = 1000.0f;
     const float zoomSpeed = 1.0f;
-
     // Use closest planet for zoom calculation if not manually zooming
     if (!sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z) &&
         !sf::Keyboard::isKeyPressed(sf::Keyboard::Key::X) &&
@@ -173,6 +173,7 @@ void GameManager::render()
 void GameManager::handleEvents()
 {
     static bool lKeyPressed = false;
+    static bool tabKeyPressed = false;  // Track Tab key state
 
     if (std::optional<sf::Event> event = window.pollEvent())
     {
@@ -222,6 +223,34 @@ void GameManager::handleEvents()
                     lKeyPressed = true;
                     activeVehicleManager->switchVehicle();
                 }
+                // Add key handler for cycling through planets with Tab
+                else if (keyEvent->code == sf::Keyboard::Key::Tab && !tabKeyPressed && uiManager) {
+                    tabKeyPressed = true;
+
+                    // Find current selected planet in the planets vector
+                    Planet* currentPlanet = nullptr;
+                    int currentIndex = -1;
+                    for (size_t i = 0; i < planets.size(); i++) {
+                        // Need to implement a getter for selectedPlanet in UIManager
+                        if (planets[i] == uiManager->getSelectedPlanet()) {
+                            currentPlanet = planets[i];
+                            currentIndex = static_cast<int>(i);
+                            break;
+                        }
+                    }
+
+                    // Move to the next planet in the list
+                    if (currentIndex >= 0 && planets.size() > 1) {
+                        int nextIndex = (currentIndex + 1) % planets.size();
+                        uiManager->setSelectedPlanet(planets[nextIndex]);
+                        std::cout << "Selected planet " << nextIndex << std::endl;
+                    }
+                    else if (!planets.empty()) {
+                        // No planet selected or not found, select the first one
+                        uiManager->setSelectedPlanet(planets[0]);
+                        std::cout << "Selected planet 0" << std::endl;
+                    }
+                }
                 // Add new key handler for dropping stored mass
                 else if (keyEvent->code == sf::Keyboard::Key::Hyphen) {
                     if (activeVehicleManager &&
@@ -233,7 +262,32 @@ void GameManager::handleEvents()
                             // Add the new planet to the simulation
                             planets.push_back(newPlanet);
                             gravitySimulator.addPlanet(newPlanet);
-                            std::cout << "Dropped mass and created new planet!" << std::endl;
+
+                            // Debug output
+                            std::cout << "Dropped mass and created new planet at position ("
+                                << newPlanet->getPosition().x << ", "
+                                << newPlanet->getPosition().y << ")" << std::endl;
+                            std::cout << "Total planets in vector: " << planets.size() << std::endl;
+
+                            // Check if uiManager is valid
+                            if (uiManager) {
+                                std::cout << "UI Manager found, setting selected planet" << std::endl;
+                                uiManager->setSelectedPlanet(newPlanet);
+
+                                // Verify selection
+                                if (uiManager->getSelectedPlanet() == newPlanet) {
+                                    std::cout << "Successfully selected new planet" << std::endl;
+                                }
+                                else {
+                                    std::cout << "Failed to select new planet" << std::endl;
+                                }
+                            }
+                            else {
+                                std::cout << "UI Manager is null, cannot select planet" << std::endl;
+                            }
+                        }
+                        else {
+                            std::cout << "Failed to create new planet (not enough mass?)" << std::endl;
                         }
                     }
                 }
@@ -242,9 +296,13 @@ void GameManager::handleEvents()
         if (event->is<sf::Event::KeyReleased>())
         {
             const auto* keyEvent = event->getIf<sf::Event::KeyReleased>();
-            if (keyEvent && keyEvent->code == sf::Keyboard::Key::L)
-            {
-                lKeyPressed = false;
+            if (keyEvent) {
+                if (keyEvent->code == sf::Keyboard::Key::L) {
+                    lKeyPressed = false;
+                }
+                else if (keyEvent->code == sf::Keyboard::Key::Tab) {
+                    tabKeyPressed = false;
+                }
             }
         }
     }
