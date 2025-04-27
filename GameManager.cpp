@@ -4,6 +4,7 @@
 #include "OrbitalMechanics.h"
 #include "GameConstants.h"
 #include "UIManager.h"  // Add this include
+#include <ctime>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -27,12 +28,14 @@ GameManager::~GameManager()
 {
     cleanup();
 }
-
 void GameManager::initialize()
 {
     // Setup game views
     zoomLevel = 1.0f;
     targetZoom = 1.0f;
+
+    // Seed the random number generator
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
     // Create main planet (sun)
     Planet* mainPlanet = new Planet(sf::Vector2f(GameConstants::MAIN_PLANET_X, GameConstants::MAIN_PLANET_Y),
@@ -40,7 +43,10 @@ void GameManager::initialize()
     mainPlanet->setVelocity(sf::Vector2f(0.f, 0.f));
     planets.push_back(mainPlanet);
 
-    // Create 9 orbiting planets with increasing sizes as they get further from the sun
+    // Determine random number of planets (1-9)
+    int planetCount = 1 + std::rand() % 9;
+
+    // Planet colors
     const sf::Color planetColors[] = {
         sf::Color(150, 150, 150),   // Mercury (gray)
         sf::Color(255, 190, 120),   // Venus (light orange)
@@ -53,16 +59,18 @@ void GameManager::initialize()
         sf::Color(230, 230, 230)    // Pluto (light gray)
     };
 
-    // Distance scaling factors - maintain different orbital distances
+    // Distance scaling factors - each planet's orbit will be spaced to avoid collisions
     const float distanceScalings[] = { 0.4f, 0.7f, 1.0f, 1.5f, 2.2f, 3.0f, 4.0f, 5.0f, 6.0f };
 
-    // Mass scaling factors - now increasing with distance (smaller planets closer to sun)
+    // Mass scaling factors - generally increasing with distance
     const float massScalings[] = { 0.1f, 0.2f, 0.3f, 0.5f, 0.8f, 1.2f, 1.8f, 2.5f, 3.5f };
 
     // Create each planet
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < planetCount; i++) {
         float orbitDistance = GameConstants::PLANET_ORBIT_DISTANCE * distanceScalings[i];
-        float angle = (i * 40.0f) * (3.14159f / 180.0f); // Distribute planets around the sun
+
+        // Randomly position planet around the orbit
+        float angle = (std::rand() % 360) * (3.14159f / 180.0f);
 
         // Calculate position based on orbit distance and angle
         float planetX = mainPlanet->getPosition().x + orbitDistance * cos(angle);
@@ -75,9 +83,12 @@ void GameManager::initialize()
         float velocityX = -sin(angle) * orbitalVelocity;
         float velocityY = cos(angle) * orbitalVelocity;
 
-        // Create the planet with scaled mass - using the base secondary planet mass
-        // multiplied by our scaling factor
+        // Create the planet with scaled mass
         float planetMass = GameConstants::SECONDARY_PLANET_MASS * massScalings[i];
+
+        // Add some randomness to mass (±30%)
+        float massRandomFactor = 0.7f + (std::rand() % 60) / 100.0f;
+        planetMass *= massRandomFactor;
 
         Planet* planet = new Planet(
             sf::Vector2f(planetX, planetY),
@@ -103,7 +114,6 @@ void GameManager::initialize()
     }
     gravitySimulator.addVehicleManager(activeVehicleManager);
 }
-
 void GameManager::update(float deltaTime)
 {
     // Update simulation - this may remove planets through collision detection
