@@ -128,33 +128,23 @@ void GameManager::update(float deltaTime)
 
 
 
-
 void GameManager::updateCamera(float deltaTime)
 {
-    // Calculate distance from vehicle to planets for automatic zoom
+    // Get vehicle position for camera centering
     sf::Vector2f vehiclePos = activeVehicleManager->getActiveVehicle()->getPosition();
-    sf::Vector2f vehicleToPlanet1 = planets[0]->getPosition() - vehiclePos;
-    sf::Vector2f vehicleToPlanet2 = planets[1]->getPosition() - vehiclePos;
-    float distance1 = std::sqrt(vehicleToPlanet1.x * vehicleToPlanet1.x + vehicleToPlanet1.y * vehicleToPlanet1.y);
-    float distance2 = std::sqrt(vehicleToPlanet2.x * vehicleToPlanet2.x + vehicleToPlanet2.y * vehicleToPlanet2.y);
+
+    // Always update view center to follow vehicle
+    gameView.setCenter(vehiclePos);
 
     const float minZoom = 1.0f;
     const float maxZoom = 1000.0f;
-    const float zoomSpeed = 1.0f;
-    // Use closest planet for zoom calculation if not manually zooming
-    if (!sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z) &&
-        !sf::Keyboard::isKeyPressed(sf::Keyboard::Key::X) &&
-        !sf::Keyboard::isKeyPressed(sf::Keyboard::Key::C)) {
-        float closest = std::min(distance1, distance2);
-        targetZoom = minZoom + (closest - (planets[0]->getRadius() + GameConstants::ROCKET_SIZE)) / 100.0f;
-        targetZoom = std::max(minZoom, std::min(targetZoom, maxZoom));
-
-        // Update view center to follow vehicle
-        gameView.setCenter(vehiclePos);
-    }
+    const float zoomSpeed = 0.10f;
 
     // Smoothly interpolate current zoom to target zoom
     zoomLevel += (targetZoom - zoomLevel) * deltaTime * zoomSpeed;
+
+    // Clamp zoom level to valid range
+    zoomLevel = std::max(minZoom, std::min(zoomLevel, maxZoom));
 
     // Set view size based on zoom level
     gameView.setSize(sf::Vector2f(1280.f * zoomLevel, 720.f * zoomLevel));
@@ -168,24 +158,15 @@ void GameManager::render()
     // Clear window
     window.clear(sf::Color::Black);
 
-    // Find the closest planet to the rocket for orbit path
-    Planet* closestPlanet = nullptr;
-    float closestDistance = std::numeric_limits<float>::max();
-    sf::Vector2f rocketPos = activeVehicleManager->getActiveVehicle()->getPosition();
-
-    for (auto& planetPtr : planets) {
-        sf::Vector2f direction = planetPtr->getPosition() - rocketPos;
-        float dist = std::sqrt(direction.x * direction.x + direction.y * direction.y);
-
-        if (dist < closestDistance) {
-            closestDistance = dist;
-            closestPlanet = planetPtr;
-        }
+    // Get the selected planet from the UI manager
+    Planet* selectedPlanet = nullptr;
+    if (uiManager) {
+        selectedPlanet = uiManager->getSelectedPlanet();
     }
 
-    // Draw orbit path only for the closest planet
-    if (closestPlanet) {
-        closestPlanet->drawOrbitPath(window, planets);
+    // Draw orbit path only for the selected planet
+    if (selectedPlanet) {
+        selectedPlanet->drawOrbitPath(window, planets);
     }
 
     // Draw trajectory only if in rocket mode
@@ -209,6 +190,7 @@ void GameManager::render()
         activeVehicleManager->getRocket()->drawGravityForceVectors(window, planets, GameConstants::GRAVITY_VECTOR_SCALE);
     }
 }
+
 
 void GameManager::handleEvents()
 {
@@ -259,10 +241,10 @@ void GameManager::handleEvents()
                     planetGravity = !planetGravity;
                     gravitySimulator.setSimulatePlanetGravity(planetGravity);
                 }
-                else if (keyEvent->code == sf::Keyboard::Key::L && !lKeyPressed) {
-                    lKeyPressed = true;
-                    activeVehicleManager->switchVehicle();
-                }
+                //else if (keyEvent->code == sf::Keyboard::Key::L && !lKeyPressed) {
+                //    lKeyPressed = true;
+                ///    activeVehicleManager->switchVehicle();
+                //}
                 // Add key handler for cycling through planets with Tab
                 else if (keyEvent->code == sf::Keyboard::Key::Tab && !tabKeyPressed && uiManager) {
                     tabKeyPressed = true;
@@ -337,10 +319,7 @@ void GameManager::handleEvents()
         {
             const auto* keyEvent = event->getIf<sf::Event::KeyReleased>();
             if (keyEvent) {
-                if (keyEvent->code == sf::Keyboard::Key::L) {
-                    lKeyPressed = false;
-                }
-                else if (keyEvent->code == sf::Keyboard::Key::Tab) {
+                if (keyEvent->code == sf::Keyboard::Key::Tab) {
                     tabKeyPressed = false;
                 }
             }
@@ -385,29 +364,22 @@ void GameManager::handleEvents()
 
     // Camera control keys
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z)) {
-        // Gradually increase zoom to see more of the system
-        targetZoom = std::min(1000.0f, targetZoom * 1.05f);
+        // Gradually increase zoom to see more of the system (zoom out)
+        targetZoom = std::min(100.0f, targetZoom * 1.05f);
         // Focus on active vehicle
         gameView.setCenter(activeVehicleManager->getActiveVehicle()->getPosition());
     }
     else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::X)) {
-        // Auto-zoom based on distance to closest planet
-        float dist1 = std::sqrt(
-            std::pow(activeVehicleManager->getActiveVehicle()->getPosition().x - planets[0]->getPosition().x, 2) +
-            std::pow(activeVehicleManager->getActiveVehicle()->getPosition().y - planets[0]->getPosition().y, 2)
-        );
-        float dist2 = std::sqrt(
-            std::pow(activeVehicleManager->getActiveVehicle()->getPosition().x - planets[1]->getPosition().x, 2) +
-            std::pow(activeVehicleManager->getActiveVehicle()->getPosition().y - planets[1]->getPosition().y, 2)
-        );
-        targetZoom = 1.0f + (std::min(dist1, dist2) - (planets[0]->getRadius() + GameConstants::ROCKET_SIZE)) / 100.0f;
+        // Gradually decrease zoom to see less of the system (zoom in)
+        targetZoom = std::max(1.0f, targetZoom / 1.05f);
+        // Focus on active vehicle
         gameView.setCenter(activeVehicleManager->getActiveVehicle()->getPosition());
     }
-    //else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::C)) {
-        // Follow planet 2
-     //   targetZoom = 10.0f;
-     //   gameView.setCenter(planets[1]->getPosition());
-    //}
+    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::C)) {
+    
+       targetZoom = 1.0f;
+       gameView.setCenter(activeVehicleManager->getActiveVehicle()->getPosition());
+    }
 }
 
 void GameManager::cleanup()

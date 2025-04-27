@@ -64,25 +64,25 @@ void InputManager::processInput(VehicleManager* vehicleManager, float deltaTime)
     }
 
     // Vehicle transformation
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::L) && !lKeyPressed) {
-        lKeyPressed = true;
-        vehicleManager->switchVehicle();
-    }
+    //if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::L) && !lKeyPressed) {
+    //    lKeyPressed = true;
+    //   vehicleManager->switchVehicle();
+    //}
 }
 
 void InputManager::handleKeyPressed(sf::Keyboard::Key key, VehicleManager* vehicleManager)
 {
-    if (key == sf::Keyboard::Key::L) {
-        lKeyPressed = true;
-        if (vehicleManager) {
-            vehicleManager->switchVehicle();
-        }
-    }
+    //if (key == sf::Keyboard::Key::L) {
+    //    lKeyPressed = true;
+    //    if (vehicleManager) {
+    //        vehicleManager->switchVehicle();
+    //    }
+    //}
 }
 
 void InputManager::handleKeyReleased(sf::Keyboard::Key key)
 {
-    if (key == sf::Keyboard::Key::L) {
-        lKeyPressed = false;
-    }
+    //if (key == sf::Keyboard::Key::L) {
+    //    lKeyPressed = false;
+    //}
 }

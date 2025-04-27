@@ -243,7 +243,7 @@ PlayerInput GameClient::getLocalPlayerInput(float deltaTime) const {
     input.thrustBackward = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S);
     input.rotateLeft = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A);
     input.rotateRight = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D);
-    input.switchVehicle = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::L);
+    //input.switchVehicle = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::L);
 
     // Get thrust level
     if (localPlayer && localPlayer->getActiveVehicleType() == VehicleType::ROCKET) {
