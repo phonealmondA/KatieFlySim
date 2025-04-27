@@ -76,134 +76,159 @@ void GameClient::update(float deltaTime) {
         pair.second->update(deltaTime);
     }
 }
-
 void GameClient::processGameState(const GameState& state) {
-    // Update last state
-    lastState = state;
-    stateTimestamp = state.timestamp;
+    try {
+        // Update last state
+        lastState = state;
+        stateTimestamp = state.timestamp;
 
-    // Process planets
-    for (const auto& planetState : state.planets) {
-        // Make sure we have enough planets
-        while (planetState.planetId >= static_cast<int>(planets.size())) {
-            planets.push_back(new Planet(sf::Vector2f(0, 0), 0, 1.0f));
-            simulator.addPlanet(planets.back());
-        }
+        // Process planets - ensure we have the right number of planets
+        for (const auto& planetState : state.planets) {
+            // Make sure we have enough planets
+            while (planetState.planetId >= static_cast<int>(planets.size())) {
+                Planet* newPlanet = new Planet(sf::Vector2f(0, 0), 0, 1.0f);
+                planets.push_back(newPlanet);
+                simulator.addPlanet(newPlanet);
+            }
 
-        // Update planet state
-        Planet* planet = planets[planetState.planetId];
-        planet->setPosition(planetState.position);
-        planet->setVelocity(planetState.velocity);
-        planet->setMass(planetState.mass);
-        // Note: setMass will update radius based on the mass-radius relationship
-    }
-
-    // Process rockets
-    for (const auto& rocketState : state.rockets) {
-        if (rocketState.playerId == localPlayerId) {
-            // This is our local player, update position for prediction correction
-            if (localPlayer) {
-                // Calculate position difference
-                sf::Vector2f posDiff = rocketState.position - localPlayer->getRocket()->getPosition();
-                float distance = std::sqrt(posDiff.x * posDiff.x + posDiff.y * posDiff.y);
-
-                // Improved client-side prediction with smoothing
-                if (distance > 20.0f) {
-                    // Hard correction for big differences
-                    localPlayer->getRocket()->setPosition(rocketState.position);
-                    localPlayer->getRocket()->setVelocity(rocketState.velocity);
-                }
-                else if (distance > 5.0f) {
-                    // Smooth interpolation for small differences
-                    sf::Vector2f correctionVector = rocketState.position - localPlayer->getRocket()->getPosition();
-                    localPlayer->getRocket()->setPosition(
-                        localPlayer->getRocket()->getPosition() + correctionVector * 0.2f);
-
-                    // Also smoothly adjust velocity
-                    sf::Vector2f velCorrection = rocketState.velocity - localPlayer->getRocket()->getVelocity();
-                    localPlayer->getRocket()->setVelocity(
-                        localPlayer->getRocket()->getVelocity() + velCorrection * 0.2f);
-                }
-
-                // Keep local rotation control for better responsiveness
-                // Only update server rotation if significantly different
-                float rotDiff = std::abs(rocketState.rotation - localPlayer->getRocket()->getRotation());
-                if (rotDiff > 45.0f) {
-                    localPlayer->getRocket()->setRotation(rocketState.rotation);
+            // Update planet state
+            if (planetState.planetId < static_cast<int>(planets.size())) {
+                Planet* planet = planets[planetState.planetId];
+                if (planet) {
+                    planet->setPosition(planetState.position);
+                    planet->setVelocity(planetState.velocity);
+                    planet->setMass(planetState.mass);
+                    // Note: setMass will update radius based on the mass-radius relationship
                 }
             }
         }
-        else {
-            // Get or create vehicle manager for this player
-            auto it = remotePlayers.find(rocketState.playerId);
-            VehicleManager* manager = nullptr;
 
-            if (it == remotePlayers.end()) {
-                // Create a new remote player
-                manager = new VehicleManager(rocketState.position, planets);
-                remotePlayers[rocketState.playerId] = manager;
-                simulator.addVehicleManager(manager);
+        // Process rockets
+        for (const auto& rocketState : state.rockets) {
+            if (rocketState.playerId == localPlayerId) {
+                // This is our local player
+                if (localPlayer && localPlayer->getRocket()) {
+                    // Calculate position difference
+                    sf::Vector2f posDiff = rocketState.position - localPlayer->getRocket()->getPosition();
+                    float distance = std::sqrt(posDiff.x * posDiff.x + posDiff.y * posDiff.y);
 
-                // Set color based on player ID
-                manager->getRocket()->setColor(sf::Color(
-                    100 + (rocketState.playerId * 50) % 155,
-                    100 + (rocketState.playerId * 30) % 155,
-                    100 + (rocketState.playerId * 70) % 155
-                ));
+                    // Improved client-side prediction with smoothing
+                    if (distance > 20.0f) {
+                        // Hard correction for big differences
+                        localPlayer->getRocket()->setPosition(rocketState.position);
+                        localPlayer->getRocket()->setVelocity(rocketState.velocity);
+                    }
+                    else if (distance > 5.0f) {
+                        // Smooth interpolation for small differences
+                        sf::Vector2f correctionVector = rocketState.position - localPlayer->getRocket()->getPosition();
+                        localPlayer->getRocket()->setPosition(
+                            localPlayer->getRocket()->getPosition() + correctionVector * 0.2f);
 
-                std::cout << "Added remote player with ID: " << rocketState.playerId << std::endl;
+                        // Also smoothly adjust velocity
+                        sf::Vector2f velCorrection = rocketState.velocity - localPlayer->getRocket()->getVelocity();
+                        localPlayer->getRocket()->setVelocity(
+                            localPlayer->getRocket()->getVelocity() + velCorrection * 0.2f);
+                    }
+
+                    // Keep local rotation control for better responsiveness
+                    // Only update server rotation if significantly different
+                    float rotDiff = std::abs(rocketState.rotation - localPlayer->getRocket()->getRotation());
+                    if (rotDiff > 45.0f) {
+                        localPlayer->getRocket()->setRotation(rocketState.rotation);
+                    }
+                }
             }
             else {
-                manager = it->second;
+                // This is a remote player
+                VehicleManager* manager = nullptr;
+                auto it = remotePlayers.find(rocketState.playerId);
+
+                if (it == remotePlayers.end()) {
+                    // Create a new remote player
+                    try {
+                        manager = new VehicleManager(rocketState.position, planets);
+                        if (manager && manager->getRocket()) {
+                            remotePlayers[rocketState.playerId] = manager;
+                            simulator.addVehicleManager(manager);
+
+                            // Set color based on player ID
+                            manager->getRocket()->setColor(sf::Color(
+                                100 + (rocketState.playerId * 50) % 155,
+                                100 + (rocketState.playerId * 30) % 155,
+                                100 + (rocketState.playerId * 70) % 155
+                            ));
+
+                            std::cout << "Added remote player with ID: " << rocketState.playerId << std::endl;
+                        }
+                        else {
+                            std::cerr << "Failed to create valid VehicleManager for remote player" << std::endl;
+                            delete manager; // Clean up if rocket initialization failed
+                        }
+                    }
+                    catch (const std::exception& e) {
+                        std::cerr << "Exception creating remote player: " << e.what() << std::endl;
+                        delete manager; // Clean up on exception
+                        continue;
+                    }
+                }
+                else {
+                    manager = it->second;
+                }
+
+                // Update rocket state with interpolation if manager exists
+                if (manager && manager->getRocket()) {
+                    Rocket* rocket = manager->getRocket();
+
+                    // Store previous position for interpolation
+                    sf::Vector2f prevPos = rocket->getPosition();
+                    sf::Vector2f prevVel = rocket->getVelocity();
+
+                    // Update with server values
+                    rocket->setPosition(rocketState.position);
+                    rocket->setVelocity(rocketState.velocity);
+                    rocket->setRotation(rocketState.rotation);
+                    rocket->setThrustLevel(rocketState.thrustLevel);
+
+                    // Store for interpolation
+                    remotePlayerStates[rocketState.playerId] = {
+                        prevPos, prevVel,
+                        rocketState.position, rocketState.velocity,
+                        rocketState.rotation,
+                        state.timestamp
+                    };
+                }
+            }
+        }
+
+        // Remove any players that weren't in the update
+        std::vector<int> playersToRemove;
+        for (const auto& pair : remotePlayers) {
+            bool found = false;
+            for (const auto& rocketState : state.rockets) {
+                if (rocketState.playerId == pair.first) {
+                    found = true;
+                    break;
+                }
             }
 
-            // Update rocket state with interpolation
-            Rocket* rocket = manager->getRocket();
-
-            // Store previous position for interpolation
-            sf::Vector2f prevPos = rocket->getPosition();
-            sf::Vector2f prevVel = rocket->getVelocity();
-
-            // Update with server values
-            rocket->setPosition(rocketState.position);
-            rocket->setVelocity(rocketState.velocity);
-            rocket->setRotation(rocketState.rotation);
-            rocket->setThrustLevel(rocketState.thrustLevel);
-
-            // Store for interpolation
-            remotePlayerStates[rocketState.playerId] = {
-                prevPos, prevVel,
-                rocketState.position, rocketState.velocity,
-                rocketState.rotation,
-                state.timestamp
-            };
-        }
-    }
-
-    // Remove any players that weren't in the update
-    std::vector<int> playersToRemove;
-    for (const auto& pair : remotePlayers) {
-        bool found = false;
-        for (const auto& rocketState : state.rockets) {
-            if (rocketState.playerId == pair.first) {
-                found = true;
-                break;
+            if (!found) {
+                playersToRemove.push_back(pair.first);
             }
         }
 
-        if (!found) {
-            playersToRemove.push_back(pair.first);
+        for (int playerId : playersToRemove) {
+            std::cout << "Remote player " << playerId << " disconnected" << std::endl;
+            if (remotePlayers[playerId]) {
+                delete remotePlayers[playerId];
+            }
+            remotePlayers.erase(playerId);
+            remotePlayerStates.erase(playerId);
         }
     }
-
-    for (int playerId : playersToRemove) {
-        std::cout << "Remote player " << playerId << " disconnected" << std::endl;
-        delete remotePlayers[playerId];
-        remotePlayers.erase(playerId);
-        remotePlayerStates.erase(playerId);
+    catch (const std::exception& e) {
+        std::cerr << "Exception in processGameState: " << e.what() << std::endl;
     }
 }
-
 void GameClient::setLatencyCompensation(float value) {
     latencyCompensation = value;
 }

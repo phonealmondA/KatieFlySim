@@ -376,7 +376,7 @@ int main(int argc, char* argv[])
             std::cerr << "Exception in event handling: " << e.what() << std::endl;
         }
 
-        // Process input for controlling the vehicle
+        // Process input for controlling the vehicle// Process input for controlling the vehicle
         if (!isMultiplayer || isHost) {
             try {
                 inputManager.processInput(activeVehicleManager, deltaTime);
@@ -385,7 +385,23 @@ int main(int argc, char* argv[])
                 std::cerr << "Exception in input processing: " << e.what() << std::endl;
             }
         }
-
+        else if (isMultiplayer && !isHost) {
+            // Client-side input processing
+            try {
+                GameClient* gameClient = networkWrapper.getClient();
+                if (gameClient && gameClient->getLocalPlayer()) {
+                    // Get and send player input to server
+                    PlayerInput input = gameClient->getLocalPlayerInput(deltaTime);
+                    // Apply input locally for responsive feel
+                    gameClient->applyLocalInput(input);
+                    // Send to server
+                    networkWrapper.getNetworkManager()->sendPlayerInput(input);
+                }
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception in client input processing: " << e.what() << std::endl;
+            }
+        }
         // Update game simulation
         if (!isMultiplayer || isHost) {
             try {

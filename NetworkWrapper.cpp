@@ -26,7 +26,6 @@ NetworkWrapper::~NetworkWrapper()
 }
 // NetworkWrapper.cpp - the relevant section to fix
 
-
 bool NetworkWrapper::initialize(bool host, const std::string& address, unsigned short port)
 {
     isMultiplayer = true;
@@ -34,14 +33,13 @@ bool NetworkWrapper::initialize(bool host, const std::string& address, unsigned 
 
     try {
         if (isHost) {
-            // Set up server
+            // Server code remains unchanged
             gameServer = new GameServer();
             if (!gameServer) {
                 std::cerr << "Failed to create GameServer instance" << std::endl;
                 return false;
             }
 
-            // Initialize server with proper exception handling
             try {
                 gameServer->initialize();
             }
@@ -52,16 +50,13 @@ bool NetworkWrapper::initialize(bool host, const std::string& address, unsigned 
                 return false;
             }
 
-            // Connect NetworkManager with GameServer
             networkManager.setGameServer(gameServer);
 
-            // Start hosting
             if (!networkManager.hostGame(port)) {
                 std::cerr << "Failed to host game on port " << port << std::endl;
                 return false;
             }
 
-            // Setup callback to handle player input
             networkManager.onPlayerInputReceived = [this](int clientId, const PlayerInput& input) {
                 if (gameServer) {
                     gameServer->handlePlayerInput(clientId, input);
@@ -71,14 +66,14 @@ bool NetworkWrapper::initialize(bool host, const std::string& address, unsigned 
             std::cout << "Successfully hosting game on port " << port << std::endl;
         }
         else {
-            // Set up client
+            // Client code - Fixed with better error handling and safety checks
             gameClient = new GameClient();
             if (!gameClient) {
                 std::cerr << "Failed to create GameClient instance" << std::endl;
                 return false;
             }
 
-            // Initialize client with proper exception handling
+            // Initialize gameClient first before setting up callbacks
             try {
                 gameClient->initialize();
             }
@@ -89,10 +84,10 @@ bool NetworkWrapper::initialize(bool host, const std::string& address, unsigned 
                 return false;
             }
 
-            // Connect NetworkManager with GameClient
+            // Set up network callbacks after client is initialized
             networkManager.setGameClient(gameClient);
 
-            // Setup callback to handle game state updates
+            // Improved callback with better error handling
             networkManager.onGameStateReceived = [this](const GameState& state) {
                 if (gameClient) {
                     try {
@@ -104,10 +99,11 @@ bool NetworkWrapper::initialize(bool host, const std::string& address, unsigned 
                 }
                 };
 
-            // Parse address
+            // Validate IP address
             sf::IpAddress serverAddress = sf::IpAddress::LocalHost;
             if (!address.empty()) {
-                if (auto resolvedAddress = sf::IpAddress::resolve(address)) {
+                auto resolvedAddress = sf::IpAddress::resolve(address);
+                if (resolvedAddress) {
                     serverAddress = *resolvedAddress;
                 }
                 else {
@@ -116,15 +112,33 @@ bool NetworkWrapper::initialize(bool host, const std::string& address, unsigned 
                 }
             }
 
-            // Connect to server
-            if (!networkManager.joinGame(serverAddress, port)) {
-                std::cerr << "Failed to connect to server at " << serverAddress.toString() << ":" << port << std::endl;
+            // Try connecting with retry logic
+            int maxRetries = 3;
+            bool connected = false;
+
+            for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                std::cout << "Connection attempt " << attempt << " of " << maxRetries << "..." << std::endl;
+
+                if (networkManager.joinGame(serverAddress, port)) {
+                    connected = true;
+                    break;
+                }
+
+                if (attempt < maxRetries) {
+                    std::cout << "Retrying in 1 second..." << std::endl;
+                    sf::sleep(sf::seconds(1));
+                }
+            }
+
+            if (!connected) {
+                std::cerr << "Failed to connect after " << maxRetries << " attempts." << std::endl;
+                delete gameClient;
+                gameClient = nullptr;
                 return false;
             }
 
-            // Set a default player ID until server assigns one
+            // Set a default player ID (will be updated by server)
             gameClient->setLocalPlayerId(1);
-
             std::cout << "Successfully connected to server at " << serverAddress.toString() << ":" << port << std::endl;
         }
 
@@ -133,7 +147,7 @@ bool NetworkWrapper::initialize(bool host, const std::string& address, unsigned 
 
         // Set client latency compensation
         if (!isHost && gameClient) {
-            gameClient->setLatencyCompensation(0.2f); // 200ms interpolation window
+            gameClient->setLatencyCompensation(0.2f);
         }
 
         return true;
@@ -155,7 +169,6 @@ bool NetworkWrapper::initialize(bool host, const std::string& address, unsigned 
         return false;
     }
 }
-
 
 void NetworkWrapper::update(float deltaTime)
 {
