@@ -1,4 +1,4 @@
-// NetworkManager.h (complete improved file)
+// NetworkManager.h
 #pragma once
 #include <SFML/Network.hpp>
 #include <vector>
@@ -17,6 +17,15 @@ enum class ConnectionState {
     CONNECTING,
     AUTHENTICATING,
     CONNECTED
+};
+
+// Message types for network communication
+enum class MessageType {
+    GAME_STATE = 1,
+    PLAYER_INPUT = 2,
+    PLAYER_ID = 3,
+    HEARTBEAT = 4,
+    DISCONNECT = 5
 };
 
 class NetworkManager {

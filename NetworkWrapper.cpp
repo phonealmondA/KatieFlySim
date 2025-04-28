@@ -15,66 +15,150 @@ NetworkWrapper::NetworkWrapper()
 
 NetworkWrapper::~NetworkWrapper()
 {
-    // Clean up resources
-    delete gameServer;
-    delete gameClient;
+    try {
+        // First disconnect network to stop any threads
+        if (networkManager.isConnected()) {
+            networkManager.disconnect();
+        }
+
+        // Then clean up resources
+        if (gameServer) {
+            delete gameServer;
+            gameServer = nullptr;
+        }
+
+        if (gameClient) {
+            delete gameClient;
+            gameClient = nullptr;
+        }
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Exception in NetworkWrapper destructor: " << e.what() << std::endl;
+    }
+    catch (...) {
+        std::cerr << "Unknown exception in NetworkWrapper destructor" << std::endl;
+    }
 }
 
 bool NetworkWrapper::initialize(bool host, const std::string& address, unsigned short port)
 {
-    isMultiplayer = true;
-    isHost = host;
+    try {
+        isMultiplayer = true;
+        isHost = host;
 
-    if (host) {
-        // Server mode
-        gameServer = new GameServer();
-        if (!networkManager.hostGame(port)) {
-            delete gameServer;
-            gameServer = nullptr;
-            return false;
+        std::cout << "Initializing network in " << (host ? "host" : "client") << " mode..." << std::endl;
+
+        if (host) {
+            // Server mode
+            try {
+                gameServer = new GameServer();
+                if (!networkManager.hostGame(port)) {
+                    std::cerr << "Failed to start server on port " << port << std::endl;
+                    delete gameServer;
+                    gameServer = nullptr;
+                    return false;
+                }
+                networkManager.setGameServer(gameServer);
+                std::cout << "Server started successfully!" << std::endl;
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception creating GameServer: " << e.what() << std::endl;
+                delete gameServer;
+                gameServer = nullptr;
+                return false;
+            }
         }
-        networkManager.setGameServer(gameServer);
+        else {
+            // Client mode
+            try {
+                gameClient = new GameClient();
+                gameClient->initialize();
+
+                std::cout << "Connecting to " << address << ":" << port << "..." << std::endl;
+
+                // Convert string address to IpAddress
+                auto serverAddressOpt = sf::IpAddress::resolve(address);
+                if (!serverAddressOpt) {
+                    std::cerr << "Failed to resolve address: " << address << std::endl;
+                    delete gameClient;
+                    gameClient = nullptr;
+                    return false;
+                }
+
+                if (!networkManager.joinGame(*serverAddressOpt, port)) {
+                    std::cerr << "Failed to connect to server" << std::endl;
+                    delete gameClient;
+                    gameClient = nullptr;
+                    return false;
+                }
+
+                // Set up callback for game state processing
+                networkManager.onGameStateReceived = [this](const GameState& state) {
+                    if (gameClient) {
+                        try {
+                            gameClient->processGameState(state);
+                        }
+                        catch (const std::exception& e) {
+                            std::cerr << "Exception processing game state: " << e.what() << std::endl;
+                        }
+                    }
+                    };
+
+                networkManager.setGameClient(gameClient);
+                std::cout << "Successfully connected to server!" << std::endl;
+                std::cout << "Network connection established." << std::endl;
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception creating GameClient: " << e.what() << std::endl;
+                delete gameClient;
+                gameClient = nullptr;
+                return false;
+            }
+        }
+
+        return true;
     }
-    else {
-        // Client mode
-        gameClient = new GameClient();
-        gameClient->initialize();
-
-        // Convert string address to IpAddress
-        auto serverAddressOpt = sf::IpAddress::resolve(address);
-        if (!serverAddressOpt) {
-            std::cerr << "Failed to resolve address: " << address << std::endl;
-            delete gameClient;
-            gameClient = nullptr;
-            return false;
-        }
-        if (!networkManager.joinGame(*serverAddressOpt, port)) {
-            delete gameClient;
-            gameClient = nullptr;
-            return false;
-        }
-
-        networkManager.setGameClient(gameClient);
+    catch (const std::exception& e) {
+        std::cerr << "Exception in initialize: " << e.what() << std::endl;
+        // Clean up any partially initialized resources
+        delete gameServer;
+        gameServer = nullptr;
+        delete gameClient;
+        gameClient = nullptr;
+        return false;
     }
-
-    return true;
+    catch (...) {
+        std::cerr << "Unknown exception in initialize" << std::endl;
+        // Clean up any partially initialized resources
+        delete gameServer;
+        gameServer = nullptr;
+        delete gameClient;
+        gameClient = nullptr;
+        return false;
+    }
 }
 
 void NetworkWrapper::update(float deltaTime)
 {
-    // Update network manager
-    networkManager.update();
+    try {
+        // Update network manager
+        networkManager.update();
 
-    // Update game components
-    if (isHost && gameServer) {
-        gameServer->update(deltaTime);
+        // Update game components
+        if (isHost && gameServer) {
+            gameServer->update(deltaTime);
 
-        // Send game state to clients
-        networkManager.sendGameState(gameServer->getGameState());
+            // Send game state to clients
+            networkManager.sendGameState(gameServer->getGameState());
+        }
+        else if (!isHost && gameClient) {
+            gameClient->update(deltaTime);
+        }
     }
-    else if (!isHost && gameClient) {
-        gameClient->update(deltaTime);
+    catch (const std::exception& e) {
+        std::cerr << "Exception in NetworkWrapper::update: " << e.what() << std::endl;
+    }
+    catch (...) {
+        std::cerr << "Unknown exception in NetworkWrapper::update" << std::endl;
     }
 }
-
-// Removed the redundant getter implementations that were already defined in the header
