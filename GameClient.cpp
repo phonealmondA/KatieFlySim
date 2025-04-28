@@ -4,14 +4,6 @@
 #include "VectorHelper.h"
 #include <iostream>
 
-// Define connection state enum for better state tracking
-enum class ClientConnectionState {
-    DISCONNECTED,
-    CONNECTING,
-    WAITING_FOR_ID,
-    WAITING_FOR_STATE,
-    CONNECTED
-};
 
 GameClient::GameClient()
     : localPlayer(nullptr),
@@ -383,13 +375,4 @@ void GameClient::interpolateRemotePlayers(float currentTime) {
 
         ++it;
     }
-}
-
-// Add these public methods for connection state checking
-bool GameClient::isConnected() const {
-    return connectionState == ClientConnectionState::CONNECTED && hasReceivedInitialState;
-}
-
-bool GameClient::isWaitingForState() const {
-    return connectionState == ClientConnectionState::WAITING_FOR_STATE;
 }

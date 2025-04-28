@@ -404,8 +404,7 @@ int main(int argc, char* argv[])
             // Center the text
             sf::FloatRect textBounds = connectingText.getLocalBounds();
 
-
-            connectingText.setPosition((window.getSize().x - textBounds.size.x) / 2,(window.getSize().y - textBounds.size.y) / 2);
+            connectingText.setPosition(sf::Vector2f((window.getSize().x - textBounds.size.x) / 2, (window.getSize().y - textBounds.size.y) / 2));
 
             window.draw(connectingText);
 
@@ -421,10 +420,7 @@ int main(int argc, char* argv[])
 
             sf::FloatRect statusBounds = statusText.getLocalBounds();
 
-            statusText.setPosition(
-                (window.getSize().x - statusBounds.size.x) / 2,
-                (window.getSize().y - statusBounds.size.y) / 2 + 40
-            );
+            statusText.setPosition(sf::Vector2f((window.getSize().x - statusBounds.size.x) / 2, (window.getSize().y - statusBounds.size.y) / 2 + 40));
 
             window.draw(statusText);
             window.display();
