@@ -24,7 +24,7 @@ void GameServer::initialize() {
     Planet* mainPlanet = new Planet(
         sf::Vector2f(GameConstants::MAIN_PLANET_X, GameConstants::MAIN_PLANET_Y),
         0, GameConstants::MAIN_PLANET_MASS, sf::Color::Yellow);
-    mainPlanet->setVelocity(sf::Vector2f(0.f, 0.f));
+    mainPlanet->setVelocity(sf::Vector2f(1.f, -1.f));
     planets.push_back(mainPlanet);
 
     // Create 9 orbiting planets with different orbital distances, sizes, and colors

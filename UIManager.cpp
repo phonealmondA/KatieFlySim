@@ -22,40 +22,52 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
     thrustMetricsPanel(font, 14, sf::Vector2f(10, 580), sf::Vector2f(300, 80)),
     multiplayerPanel(font, 14, sf::Vector2f(window.getSize().x - 310, 10), sf::Vector2f(300, 100)),
     // Initialize mass transfer buttons
-    increaseMassButton(
-        sf::Vector2f(320, 20),
-        sf::Vector2f(80, 30),
-        "fuel --",
-        font,
-        [this]() {
-            if (selectedPlanet && activeVehicleManager) {
-                Rocket* rocket = activeVehicleManager->getRocket();
-                if (rocket && rocket->getStoredMass() > 0.0f) {
-                    // Transfer 0.01 units of mass from rocket to planet
-                    float massToTransfer = 0.05f;
-                    rocket->addStoredMass(-massToTransfer); // Remove from rocket
-                    selectedPlanet->setMass(selectedPlanet->getMass() + massToTransfer); // Add to planet
-                }
+    // In UIManager constructor, change the button implementations:
+// For increaseMassButton (fuel --)
+increaseMassButton(
+    sf::Vector2f(320, 20),
+    sf::Vector2f(80, 30),
+    "fuel --",
+    font,
+    [this]() {
+        static bool isActive = false;
+        isActive = !isActive; // Toggle state
+
+        if (isActive && selectedPlanet && activeVehicleManager) {
+            Rocket* rocket = activeVehicleManager->getRocket();
+            if (rocket && rocket->getStoredMass() > 0.0f) {
+                // Schedule a periodic fuel transfer that will continue until toggled off
+                fuelDecreaseActive = true;
             }
         }
-    ),
-    decreaseMassButton(
-        sf::Vector2f(320, 60),
-        sf::Vector2f(80, 30),
-        "fuel ++",
-        font,
-        [this]() {
-            if (selectedPlanet && activeVehicleManager) {
-                Rocket* rocket = activeVehicleManager->getRocket();
-                if (rocket && selectedPlanet->getMass() > 1.0f) { // Don't let planet go below 1 mass
-                    // Transfer 0.01 units of mass from planet to rocket
-                    float massToTransfer = 0.05f;
-                    selectedPlanet->setMass(selectedPlanet->getMass() - massToTransfer); // Remove from planet
-                    rocket->addStoredMass(massToTransfer); // Add to rocket
-                }
+        else {
+            fuelDecreaseActive = false;
+        }
+    }
+),
+
+// For decreaseMassButton (fuel ++)
+decreaseMassButton(
+    sf::Vector2f(320, 60),
+    sf::Vector2f(80, 30),
+    "fuel ++",
+    font,
+    [this]() {
+        static bool isActive = false;
+        isActive = !isActive; // Toggle state
+
+        if (isActive && selectedPlanet && activeVehicleManager) {
+            Rocket* rocket = activeVehicleManager->getRocket();
+            if (rocket && selectedPlanet->getMass() > 1.0f) {
+                // Schedule a periodic fuel transfer that will continue until toggled off
+                fuelIncreaseActive = true;
             }
         }
-    ),
+        else {
+            fuelIncreaseActive = false;
+        }
+    }
+),
     // Initialize engine upgrade buttons
     increaseThrustButton(
         sf::Vector2f(320, 100),  // Position below the other buttons
@@ -90,7 +102,6 @@ UIManager::UIManager(sf::RenderWindow& window, sf::Font& font, sf::View& uiView,
 {
     // Constructor body - can be empty
 }
-
 void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*>& planets, float deltaTime)
 {
     // Store the current vehicle manager
@@ -99,7 +110,7 @@ void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*
     // Only update if we have a valid vehicle manager
     if (!vehicleManager) return;
 
-    // Find nearest planet for planet info display and mass buttons
+    // Find nearest planet for planet info display
     nearestPlanet = findNearestPlanet(vehicleManager, planets);
 
     // If no planet is manually selected, use the nearest
@@ -121,12 +132,56 @@ void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*
         }
     }
 
+    // Check if rocket is within fuel transfer distance of selected planet
+    bool withinTransferDistance = false;
+    if (selectedPlanet && activeVehicleManager && activeVehicleManager->getRocket()) {
+        float distance = std::sqrt(
+            std::pow(activeVehicleManager->getRocket()->getPosition().x - selectedPlanet->getPosition().x, 2) +
+            std::pow(activeVehicleManager->getRocket()->getPosition().y - selectedPlanet->getPosition().y, 2)
+        );
+
+        withinTransferDistance = distance <= (selectedPlanet->getRadius() + GameConstants::FUEL_TRANSFER_DISTANCE);
+    }
+
+    // Handle periodic fuel transfers if active
+    fuelTransferTimer += deltaTime;
+
+    if (fuelTransferTimer >= fuelTransferRate) {
+        if (withinTransferDistance) {
+            if (fuelDecreaseActive && selectedPlanet && activeVehicleManager) {
+                Rocket* rocket = activeVehicleManager->getRocket();
+                if (rocket && rocket->getStoredMass() > 0.0f) {
+                    // Transfer fuel from rocket to planet
+                    rocket->addStoredMass(-GameConstants::FUEL_TRANSFER_AMOUNT); // Remove from rocket
+                    selectedPlanet->setMass(selectedPlanet->getMass() + GameConstants::FUEL_TRANSFER_AMOUNT); // Add to planet
+                }
+            }
+            if (fuelIncreaseActive && selectedPlanet && activeVehicleManager) {
+                Rocket* rocket = activeVehicleManager->getRocket();
+                if (rocket && selectedPlanet->getMass() > 1.0f) { // Don't let planet go below 1 mass
+                    // Transfer fuel from planet to rocket
+                    selectedPlanet->setMass(selectedPlanet->getMass() - GameConstants::FUEL_TRANSFER_AMOUNT); // Remove from planet
+                    rocket->addStoredMass(GameConstants::FUEL_TRANSFER_AMOUNT); // Add to rocket
+                }
+            }
+        }
+        else {
+            // Automatically deactivate if we're out of range
+            fuelDecreaseActive = false;
+            fuelIncreaseActive = false;
+        }
+        fuelTransferTimer = 0.0f;
+    }
+
+
+
     // Update UI panels
     updateRocketInfo(vehicleManager);
     updatePlanetInfo(vehicleManager, planets);
     updateOrbitInfo(vehicleManager, planets);
     updateThrustMetrics(vehicleManager, planets);
     updateControlsInfo();
+
     // Update button states - check if mouse is hovering over buttons
     sf::Vector2i mousePosition = sf::Mouse::getPosition(window);
     sf::Vector2f mousePosView = window.mapPixelToCoords(mousePosition, uiView);
@@ -134,22 +189,23 @@ void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*
     increaseMassButton.update(mousePosView);
     decreaseMassButton.update(mousePosView);
 
-    // Also update the new engine upgrade buttons
+    // Also update the engine upgrade buttons
     increaseThrustButton.update(mousePosView);
     increaseEfficiencyButton.update(mousePosView);
 
     // Check for button clicks
     if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
-        increaseMassButton.handleClick();
-        decreaseMassButton.handleClick();
+        // Only allow fuel transfer buttons if within range
+        if (withinTransferDistance) {
+            increaseMassButton.handleClick();
+            decreaseMassButton.handleClick();
+        }
 
-        // Also handle clicks for the new buttons
+        // Engine upgrade buttons aren't distance-limited
         increaseThrustButton.handleClick();
         increaseEfficiencyButton.handleClick();
     }
 }
-
-
 
 
 
@@ -175,25 +231,59 @@ void UIManager::render()
         multiplayerPanel.draw(window);
     }
 
-    // Draw planet mass control buttons
+    // Draw planet mass control buttons with color based on distance
     if (selectedPlanet) {
-        increaseMassButton.draw(window);
-        decreaseMassButton.draw(window);
+        // Determine if within transfer distance
+        bool withinTransferDistance = false;
+        if (activeVehicleManager && activeVehicleManager->getRocket()) {
+            float distance = std::sqrt(
+                std::pow(activeVehicleManager->getRocket()->getPosition().x - selectedPlanet->getPosition().x, 2) +
+                std::pow(activeVehicleManager->getRocket()->getPosition().y - selectedPlanet->getPosition().y, 2)
+            );
+
+            withinTransferDistance = distance <= (selectedPlanet->getRadius() + GameConstants::FUEL_TRANSFER_DISTANCE);
+        }
+
+        // Create custom shapes instead of drawing the buttons directly
+        sf::RectangleShape decreaseShape = increaseMassButton.getShape();
+        sf::RectangleShape increaseShape = decreaseMassButton.getShape();
+
+        // Set positions
+        decreaseShape.setPosition(increaseMassButton.getPosition());
+        increaseShape.setPosition(decreaseMassButton.getPosition());
+
+        // Set colors based on active state and transfer distance
+        if (!withinTransferDistance) {
+            // Disabled appearance
+            decreaseShape.setFillColor(sf::Color(80, 80, 80, 150));
+            increaseShape.setFillColor(sf::Color(80, 80, 80, 150));
+        }
+        else {
+            // Normal or active appearance
+            decreaseShape.setFillColor(fuelDecreaseActive ?
+                sf::Color(200, 50, 50, 200) : sf::Color(100, 100, 100, 200));
+            increaseShape.setFillColor(fuelIncreaseActive ?
+                sf::Color(50, 200, 50, 200) : sf::Color(100, 100, 100, 200));
+        }
+
+        // Draw the custom shapes
+        window.draw(decreaseShape);
+        window.draw(increaseShape);
 
         // Draw button labels
-        sf::Text plusText(font, "");
-        plusText.setString("fuel --");
-        plusText.setCharacterSize(20);
-        plusText.setFillColor(sf::Color::White);
-        plusText.setPosition(increaseMassButton.getPosition() + sf::Vector2f(10, 3));
-        window.draw(plusText);
+        sf::Text decreaseText(font, "");
+        decreaseText.setString("fuel --");
+        decreaseText.setCharacterSize(20);
+        decreaseText.setFillColor(withinTransferDistance ? sf::Color::White : sf::Color(150, 150, 150));
+        decreaseText.setPosition(increaseMassButton.getPosition() + sf::Vector2f(10, 3));
+        window.draw(decreaseText);
 
-        sf::Text minusText(font, "");
-        minusText.setString("fuel ++");
-        minusText.setCharacterSize(20);
-        minusText.setFillColor(sf::Color::White);
-        minusText.setPosition(decreaseMassButton.getPosition() + sf::Vector2f(10, 3));
-        window.draw(minusText);
+        sf::Text increaseText(font, "");
+        increaseText.setString("fuel ++");
+        increaseText.setCharacterSize(20);
+        increaseText.setFillColor(withinTransferDistance ? sf::Color::White : sf::Color(150, 150, 150));
+        increaseText.setPosition(decreaseMassButton.getPosition() + sf::Vector2f(10, 3));
+        window.draw(increaseText);
     }
 
     // Draw engine upgrade buttons when in rocket mode
@@ -245,12 +335,23 @@ void UIManager::render()
         highlight.setOutlineColor(sf::Color::Yellow);
         highlight.setOutlineThickness(2.0f);
         window.draw(highlight);
+
+        // Optionally draw the fuel transfer range indicator
+        if (activeVehicleManager && activeVehicleManager->getRocket()) {
+            sf::CircleShape transferRange;
+            transferRange.setRadius(selectedPlanet->getRadius() + GameConstants::FUEL_TRANSFER_DISTANCE);
+            transferRange.setOrigin(sf::Vector2f(transferRange.getRadius(), transferRange.getRadius()));
+            transferRange.setPosition(selectedPlanet->getPosition());
+            transferRange.setFillColor(sf::Color::Transparent);
+            transferRange.setOutlineColor(sf::Color(100, 255, 100, 80)); // Light green, semi-transparent
+            transferRange.setOutlineThickness(2.0f);
+            window.draw(transferRange);
+        }
     }
 
     // Restore UI view
     window.setView(uiView);
 }
-
 
 
     void UIManager::updateRocketInfo(VehicleManager* vehicleManager)

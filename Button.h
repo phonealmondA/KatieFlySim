@@ -19,7 +19,8 @@ public:
     void handleClick();
     void draw(sf::RenderWindow& window);
     bool contains(const sf::Vector2f& point) const;
-
+    // In Button.h add:
+    const sf::RectangleShape& getShape() const { return shape; }
     // Added getter methods for position and size
     sf::Vector2f getPosition() const { return shape.getPosition(); }
     sf::Vector2f getSize() const { return shape.getSize(); }

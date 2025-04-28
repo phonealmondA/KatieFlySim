@@ -27,7 +27,10 @@ private:
     VehicleManager* activeVehicleManager;
 
     Planet* selectedPlanet;
-
+    bool fuelDecreaseActive = false;
+    bool fuelIncreaseActive = false;
+    float fuelTransferTimer = 0.0f;
+    const float fuelTransferRate = 0.1f; // How often to transfer fuel (seconds)
 
     Button increaseThrustButton;
     Button increaseEfficiencyButton;

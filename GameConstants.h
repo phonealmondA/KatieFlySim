@@ -7,11 +7,11 @@ namespace GameConstants {
     constexpr float PI = 3.14159265358979323846f;
 
     // Mass-radius relationship constants
-    constexpr float BASE_RADIUS_FACTOR = 100.0f;  // Base size factor for planets
-    constexpr float REFERENCE_MASS = 50000.0f;  // Reference mass for radius scaling
+    constexpr float BASE_RADIUS_FACTOR = 300.0f;  // Base size factor for planets
+    constexpr float REFERENCE_MASS = 100000.0f;  // Reference mass for radius scaling
 
     // Primary inputs
-    constexpr float MAIN_PLANET_MASS = 50000.0f;  // Primary parameter to adjust
+    constexpr float MAIN_PLANET_MASS = 100000.0f;  // Primary parameter to adjust
     constexpr float ORBIT_PERIOD = 420.0f;  // Desired orbit period in seconds
 
     // Derived parameters
@@ -68,4 +68,11 @@ namespace GameConstants {
     // Fuel constants
     constexpr float BASE_FUEL_CONSUMPTION_RATE = 0.5f;  // Units of fuel consumed per second at full thrust
     constexpr float FUEL_EFFICIENCY_MULTIPLIER = 0.01f;   // Higher values mean more efficient engines
+
+    // Fuel transfer distance limit
+    constexpr float FUEL_TRANSFER_DISTANCE = 100.0f;  // Maximum distance to transfer fuel between rocket and planet
+
+    // Fuel transfer rate
+    constexpr float FUEL_TRANSFER_AMOUNT = 0.25f;  // Amount of fuel transferred per tick
+
 }

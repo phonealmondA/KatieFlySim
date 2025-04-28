@@ -28,24 +28,23 @@ GameManager::~GameManager()
 {
     cleanup();
 }
+
+
+
 void GameManager::initialize()
 {
     // Setup game views
     zoomLevel = 1.0f;
     targetZoom = 1.0f;
-
     // Seed the random number generator
     std::srand(static_cast<unsigned int>(std::time(nullptr)));
-
     // Create main planet (sun)
     Planet* mainPlanet = new Planet(sf::Vector2f(GameConstants::MAIN_PLANET_X, GameConstants::MAIN_PLANET_Y),
         0, GameConstants::MAIN_PLANET_MASS, sf::Color::Yellow);
-    mainPlanet->setVelocity(sf::Vector2f(0.f, 0.f));
+    mainPlanet->setVelocity(sf::Vector2f(1.f, -1.f));
     planets.push_back(mainPlanet);
-
     // Determine random number of planets (1-9)
     int planetCount = 1 + std::rand() % 9;
-
     // Planet colors
     const sf::Color planetColors[] = {
         sf::Color(150, 150, 150),   // Mercury (gray)
@@ -58,49 +57,57 @@ void GameManager::initialize()
         sf::Color(100, 130, 255),   // Neptune (dark blue)
         sf::Color(230, 230, 230)    // Pluto (light gray)
     };
-
     // Distance scaling factors - each planet's orbit will be spaced to avoid collisions
     const float distanceScalings[] = { 0.4f, 0.7f, 1.0f, 1.5f, 2.2f, 3.0f, 4.0f, 5.0f, 6.0f };
-
     // Mass scaling factors - generally increasing with distance
     const float massScalings[] = { 0.1f, 0.2f, 0.3f, 0.5f, 0.8f, 1.2f, 1.8f, 2.5f, 3.5f };
-
     // Create each planet
     for (int i = 0; i < planetCount; i++) {
         float orbitDistance = GameConstants::PLANET_ORBIT_DISTANCE * distanceScalings[i];
-
         // Randomly position planet around the orbit
         float angle = (std::rand() % 360) * (3.14159f / 180.0f);
-
         // Calculate position based on orbit distance and angle
         float planetX = mainPlanet->getPosition().x + orbitDistance * cos(angle);
         float planetY = mainPlanet->getPosition().y + orbitDistance * sin(angle);
-
         // Calculate orbital velocity for a stable circular orbit
         float orbitalVelocity = std::sqrt(GameConstants::G * mainPlanet->getMass() / orbitDistance);
-
         // Velocity is perpendicular to position vector
         float velocityX = -sin(angle) * orbitalVelocity;
         float velocityY = cos(angle) * orbitalVelocity;
-
         // Create the planet with scaled mass
         float planetMass = GameConstants::SECONDARY_PLANET_MASS * massScalings[i];
-
         // Add some randomness to mass (±30%)
         float massRandomFactor = 0.7f + (std::rand() % 60) / 100.0f;
         planetMass *= massRandomFactor;
-
         Planet* planet = new Planet(
             sf::Vector2f(planetX, planetY),
             0, planetMass, planetColors[i]);
-
         planet->setVelocity(sf::Vector2f(velocityX, velocityY));
         planets.push_back(planet);
     }
 
-    // Calculate position for rocket - start at the top of the first planet
-    sf::Vector2f planetPos = mainPlanet->getPosition();
-    float planetRadius = mainPlanet->getRadius();
+    // Find the second largest planet
+    Planet* secondLargestPlanet = nullptr;
+    Planet* largestPlanet = mainPlanet; // Main planet is typically the largest
+    float secondLargestMass = 0.0f;
+
+    // Loop through all planets (except the main one) to find second largest
+    for (size_t i = 1; i < planets.size(); i++) {
+        float mass = planets[i]->getMass();
+        if (mass > secondLargestMass) {
+            secondLargestPlanet = planets[i];
+            secondLargestMass = mass;
+        }
+    }
+
+    // If no second planet was found or only one planet exists, use the main planet
+    if (!secondLargestPlanet) {
+        secondLargestPlanet = mainPlanet;
+    }
+
+    // Calculate position for rocket - start at the top of the second largest planet
+    sf::Vector2f planetPos = secondLargestPlanet->getPosition();
+    float planetRadius = secondLargestPlanet->getRadius();
     sf::Vector2f direction(0, -1);
     sf::Vector2f rocketPos = planetPos + direction * (planetRadius + GameConstants::ROCKET_SIZE);
 
@@ -114,6 +121,8 @@ void GameManager::initialize()
     }
     gravitySimulator.addVehicleManager(activeVehicleManager);
 }
+
+
 void GameManager::update(float deltaTime)
 {
     // Update simulation - this may remove planets through collision detection
