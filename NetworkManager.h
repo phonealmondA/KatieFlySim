@@ -11,6 +11,14 @@
 class GameServer;
 class GameClient;
 
+// Connection state enum
+enum class ConnectionState {
+    DISCONNECTED,
+    CONNECTING,
+    AUTHENTICATING,
+    CONNECTED
+};
+
 class NetworkManager {
 private:
     bool isHost;
@@ -28,6 +36,9 @@ private:
     sf::Clock lastPacketTime;
     int packetLossCounter;
     int pingMs;
+
+    // Connection state tracking
+    ConnectionState connectionState;
 
 public:
     NetworkManager();
@@ -51,6 +62,7 @@ public:
 
     bool isConnected() const { return connected; }
     bool getIsHost() const { return isHost; }
+    bool isFullyConnected() const { return connected && connectionState == ConnectionState::CONNECTED; }
 
     // Callbacks to be set by the game
     std::function<void(int clientId, const PlayerInput&)> onPlayerInputReceived;

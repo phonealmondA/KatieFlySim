@@ -282,11 +282,11 @@ void GameClient::setLatencyCompensation(float value) {
     latencyCompensation = value;
 }
 
-void GameClient::setLocalPlayerId(int id) {
-    localPlayerId = id;
-    connectionState = ClientConnectionState::WAITING_FOR_STATE;
-    std::cout << "Local player ID set to: " << id << std::endl;
-}
+//void GameClient::setLocalPlayerId(int id) {
+//    localPlayerId = id;
+//    connectionState = ClientConnectionState::WAITING_FOR_STATE;
+//    std::cout << "Local player ID set to: " << id << std::endl;
+//}
 
 PlayerInput GameClient::getLocalPlayerInput(float deltaTime) const {
     PlayerInput input;

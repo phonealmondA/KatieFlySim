@@ -1,4 +1,4 @@
-// GameClient.h (improved file)
+// GameClient.h
 #pragma once
 #include "GravitySimulator.h"
 #include "VehicleManager.h"
@@ -6,6 +6,15 @@
 #include "PlayerInput.h"
 #include <vector>
 #include <map>
+
+// Forward declaration for connection state
+enum class ClientConnectionState {
+    DISCONNECTED,
+    CONNECTING,
+    WAITING_FOR_ID,
+    WAITING_FOR_STATE,
+    CONNECTED
+};
 
 // Struct to store interpolation data for remote players
 struct RemotePlayerState {
@@ -33,6 +42,10 @@ private:
     std::map<int, RemotePlayerState> remotePlayerStates;
     float latencyCompensation; // Time window for interpolation
 
+    // Connection state tracking
+    ClientConnectionState connectionState;
+    bool hasReceivedInitialState;
+
 public:
     GameClient();
     ~GameClient();
@@ -57,4 +70,8 @@ public:
     VehicleManager* getLocalPlayer() { return localPlayer; }
     const std::vector<Planet*>& getPlanets() const { return planets; }
     const std::map<int, VehicleManager*>& getRemotePlayers() const { return remotePlayers; }
+
+    // Connection state methods
+    bool isConnected() const { return connectionState == ClientConnectionState::CONNECTED && hasReceivedInitialState; }
+    bool isWaitingForState() const { return connectionState == ClientConnectionState::WAITING_FOR_STATE; }
 };

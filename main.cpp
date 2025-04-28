@@ -383,7 +383,7 @@ int main(int argc, char* argv[])
         if (connectionState != AppConnectionState::CONNECTED) {
             window.clear(sf::Color(20, 20, 50)); // Dark blue background
 
-            sf::Text connectingText;
+            sf::Text connectingText(font, "");
             connectingText.setFont(font);
 
             switch (connectionState) {
@@ -403,15 +403,14 @@ int main(int argc, char* argv[])
 
             // Center the text
             sf::FloatRect textBounds = connectingText.getLocalBounds();
-            connectingText.setPosition(
-                (window.getSize().x - textBounds.width) / 2,
-                (window.getSize().y - textBounds.height) / 2
-            );
+
+
+            connectingText.setPosition((window.getSize().x - textBounds.size.x) / 2,(window.getSize().y - textBounds.size.y) / 2);
 
             window.draw(connectingText);
 
             // Add connection status info
-            sf::Text statusText;
+            sf::Text statusText(font, "");
             statusText.setFont(font);
             statusText.setCharacterSize(16);
             statusText.setFillColor(sf::Color(200, 200, 200));
@@ -421,9 +420,10 @@ int main(int argc, char* argv[])
             statusText.setString(statusMessage);
 
             sf::FloatRect statusBounds = statusText.getLocalBounds();
+
             statusText.setPosition(
-                (window.getSize().x - statusBounds.width) / 2,
-                (window.getSize().y - statusBounds.height) / 2 + 40
+                (window.getSize().x - statusBounds.size.x) / 2,
+                (window.getSize().y - statusBounds.size.y) / 2 + 40
             );
 
             window.draw(statusText);
