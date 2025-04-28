@@ -103,18 +103,18 @@ void MenuSystem::handleEvents()
                 {
                     currentState = MenuGameState::SINGLE_PLAYER;
                 }
-                else if (keyEvent->code == sf::Keyboard::Key::H && currentState == MenuGameState::MENU)
-                {
-                    launchHostProcess();
-                }
+                //else if (keyEvent->code == sf::Keyboard::Key::H && currentState == MenuGameState::MENU)
+                //{
+                //    launchHostProcess();
+                //}
                 else if (keyEvent->code == sf::Keyboard::Key::J && currentState == MenuGameState::MENU)
                 {
                     currentState = MenuGameState::JOIN_MENU;
                 }
-                else if (keyEvent->code == sf::Keyboard::Key::C && currentState == MenuGameState::JOIN_MENU)
-                {
-                    currentState = MenuGameState::MULTIPLAYER_CLIENT;
-                }
+                //else if (keyEvent->code == sf::Keyboard::Key::C && currentState == MenuGameState::JOIN_MENU)
+                //{
+                //    currentState = MenuGameState::MULTIPLAYER_CLIENT;
+                //}
 
                 // Handle text input for join menu
                 if (currentState == MenuGameState::JOIN_MENU)

@@ -1,14 +1,25 @@
-// GameClient.cpp (complete improved file)
+// GameClient.cpp
 #include "GameClient.h"
 #include "GameConstants.h"
 #include "VectorHelper.h"
-#include <iostream> // For std::cout
+#include <iostream>
+
+// Define connection state enum for better state tracking
+enum class ClientConnectionState {
+    DISCONNECTED,
+    CONNECTING,
+    WAITING_FOR_ID,
+    WAITING_FOR_STATE,
+    CONNECTED
+};
 
 GameClient::GameClient()
     : localPlayer(nullptr),
     localPlayerId(0),
     stateTimestamp(0.0f),
-    latencyCompensation(0.05f) {
+    latencyCompensation(0.05f),
+    connectionState(ClientConnectionState::DISCONNECTED),
+    hasReceivedInitialState(false) {
 }
 
 GameClient::~GameClient() {
@@ -19,6 +30,7 @@ GameClient::~GameClient() {
     remotePlayers.clear();
 
     delete localPlayer;
+    localPlayer = nullptr;
 
     // Clean up planets
     for (auto& planet : planets) {
@@ -28,6 +40,10 @@ GameClient::~GameClient() {
 }
 
 void GameClient::initialize() {
+    // Flag that we're still waiting for initial state
+    hasReceivedInitialState = false;
+    connectionState = ClientConnectionState::CONNECTING;
+
     // Create main planet (placeholder until we get state from server)
     Planet* mainPlanet = new Planet(
         sf::Vector2f(GameConstants::MAIN_PLANET_X, GameConstants::MAIN_PLANET_Y),
@@ -45,6 +61,11 @@ void GameClient::initialize() {
     // Setup local player (placeholder until we get assigned ID)
     sf::Vector2f initialPos = planets[0]->getPosition() +
         sf::Vector2f(0, -(planets[0]->getRadius() + GameConstants::ROCKET_SIZE));
+
+    // Always check null pointers
+    if (localPlayer) {
+        delete localPlayer;
+    }
     localPlayer = new VehicleManager(initialPos, planets);
 
     // Setup gravity simulator
@@ -56,31 +77,52 @@ void GameClient::initialize() {
 }
 
 void GameClient::update(float deltaTime) {
-    // Update simulator
-    simulator.update(deltaTime);
-
-    // Update planets
-    for (auto planet : planets) {
-        planet->update(deltaTime);
+    // Skip updates if not fully connected
+    if (connectionState != ClientConnectionState::CONNECTED && !hasReceivedInitialState) {
+        return;
     }
 
-    // Update local player
+    // Update simulator with null checking
+    simulator.update(deltaTime);
+
+    // Update planets with null checking
+    for (auto planet : planets) {
+        if (planet) {
+            planet->update(deltaTime);
+        }
+    }
+
+    // Update local player with null checking
     if (localPlayer) {
         localPlayer->update(deltaTime);
     }
 
-    // Update remote players
+    // Update remote players with null checking
     for (auto& pair : remotePlayers) {
-        // For remote players, use interpolation based on received state
-        // and dead reckoning for prediction
-        pair.second->update(deltaTime);
+        if (pair.second) {
+            pair.second->update(deltaTime);
+        }
     }
 }
+
 void GameClient::processGameState(const GameState& state) {
     try {
+        // Don't process empty states
+        if (state.planets.empty()) {
+            std::cerr << "Received empty game state" << std::endl;
+            return;
+        }
+
         // Update last state
         lastState = state;
         stateTimestamp = state.timestamp;
+
+        // Update connection state if this is our first state
+        if (!hasReceivedInitialState) {
+            connectionState = ClientConnectionState::CONNECTED;
+            hasReceivedInitialState = true;
+            std::cout << "Received initial game state" << std::endl;
+        }
 
         // Process planets - ensure we have the right number of planets
         for (const auto& planetState : state.planets) {
@@ -98,7 +140,6 @@ void GameClient::processGameState(const GameState& state) {
                     planet->setPosition(planetState.position);
                     planet->setVelocity(planetState.velocity);
                     planet->setMass(planetState.mass);
-                    // Note: setMass will update radius based on the mass-radius relationship
                 }
             }
         }
@@ -107,6 +148,12 @@ void GameClient::processGameState(const GameState& state) {
         for (const auto& rocketState : state.rockets) {
             if (rocketState.playerId == localPlayerId) {
                 // This is our local player
+                if (!localPlayer) {
+                    // Create local player if it doesn't exist
+                    localPlayer = new VehicleManager(rocketState.position, planets);
+                    simulator.addVehicleManager(localPlayer);
+                }
+
                 if (localPlayer && localPlayer->getRocket()) {
                     // Calculate position difference
                     sf::Vector2f posDiff = rocketState.position - localPlayer->getRocket()->getPosition();
@@ -219,6 +266,7 @@ void GameClient::processGameState(const GameState& state) {
         for (int playerId : playersToRemove) {
             std::cout << "Remote player " << playerId << " disconnected" << std::endl;
             if (remotePlayers[playerId]) {
+                simulator.removeVehicleManager(remotePlayers[playerId]);
                 delete remotePlayers[playerId];
             }
             remotePlayers.erase(playerId);
@@ -229,8 +277,15 @@ void GameClient::processGameState(const GameState& state) {
         std::cerr << "Exception in processGameState: " << e.what() << std::endl;
     }
 }
+
 void GameClient::setLatencyCompensation(float value) {
     latencyCompensation = value;
+}
+
+void GameClient::setLocalPlayerId(int id) {
+    localPlayerId = id;
+    connectionState = ClientConnectionState::WAITING_FOR_STATE;
+    std::cout << "Local player ID set to: " << id << std::endl;
 }
 
 PlayerInput GameClient::getLocalPlayerInput(float deltaTime) const {
@@ -238,15 +293,19 @@ PlayerInput GameClient::getLocalPlayerInput(float deltaTime) const {
     input.playerId = localPlayerId;
     input.deltaTime = deltaTime;
 
+    // Skip input collection if not fully connected
+    if (connectionState != ClientConnectionState::CONNECTED || !hasReceivedInitialState || !localPlayer) {
+        return input;
+    }
+
     // Get keyboard state
     input.thrustForward = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W);
     input.thrustBackward = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S);
     input.rotateLeft = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A);
     input.rotateRight = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D);
-    //input.switchVehicle = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::L);
 
     // Get thrust level
-    if (localPlayer && localPlayer->getActiveVehicleType() == VehicleType::ROCKET) {
+    if (localPlayer && localPlayer->getActiveVehicleType() == VehicleType::ROCKET && localPlayer->getRocket()) {
         input.thrustLevel = localPlayer->getRocket()->getThrustLevel();
     }
 
@@ -254,7 +313,10 @@ PlayerInput GameClient::getLocalPlayerInput(float deltaTime) const {
 }
 
 void GameClient::applyLocalInput(const PlayerInput& input) {
-    if (!localPlayer) return;
+    // Skip if not fully connected or no local player
+    if (!hasReceivedInitialState || connectionState != ClientConnectionState::CONNECTED || !localPlayer) {
+        return;
+    }
 
     // Apply input to local player immediately for responsive feel
     if (input.thrustForward) {
@@ -274,18 +336,34 @@ void GameClient::applyLocalInput(const PlayerInput& input) {
     }
 
     // Apply thrust level
-    if (localPlayer->getActiveVehicleType() == VehicleType::ROCKET) {
+    if (localPlayer->getActiveVehicleType() == VehicleType::ROCKET && localPlayer->getRocket()) {
         localPlayer->getRocket()->setThrustLevel(input.thrustLevel);
     }
 }
 
 void GameClient::interpolateRemotePlayers(float currentTime) {
-    for (auto& [playerId, stateData] : remotePlayerStates) {
-        auto it = remotePlayers.find(playerId);
-        if (it == remotePlayers.end()) continue;
+    // Skip if not fully connected
+    if (!hasReceivedInitialState || connectionState != ClientConnectionState::CONNECTED) {
+        return;
+    }
 
-        VehicleManager* manager = it->second;
+    for (auto it = remotePlayerStates.begin(); it != remotePlayerStates.end(); ) {
+        int playerId = it->first;
+        RemotePlayerState& stateData = it->second;
+
+        auto playerIt = remotePlayers.find(playerId);
+        if (playerIt == remotePlayers.end() || !playerIt->second || !playerIt->second->getRocket()) {
+            // Remove stale state if player no longer exists
+            it = remotePlayerStates.erase(it);
+            continue;
+        }
+
+        VehicleManager* manager = playerIt->second;
         Rocket* rocket = manager->getRocket();
+        if (!rocket) {
+            ++it;
+            continue;
+        }
 
         // Calculate interpolation factor
         float timeElapsed = currentTime - stateData.timestamp;
@@ -295,7 +373,23 @@ void GameClient::interpolateRemotePlayers(float currentTime) {
         sf::Vector2f interpolatedPos = stateData.startPos + (stateData.targetPos - stateData.startPos) * alpha;
         sf::Vector2f interpolatedVel = stateData.startVel + (stateData.targetVel - stateData.startVel) * alpha;
 
-        rocket->setPosition(interpolatedPos);
-        rocket->setVelocity(interpolatedVel);
+        try {
+            rocket->setPosition(interpolatedPos);
+            rocket->setVelocity(interpolatedVel);
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Exception in interpolateRemotePlayers: " << e.what() << std::endl;
+        }
+
+        ++it;
     }
+}
+
+// Add these public methods for connection state checking
+bool GameClient::isConnected() const {
+    return connectionState == ClientConnectionState::CONNECTED && hasReceivedInitialState;
+}
+
+bool GameClient::isWaitingForState() const {
+    return connectionState == ClientConnectionState::WAITING_FOR_STATE;
 }

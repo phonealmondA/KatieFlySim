@@ -188,8 +188,10 @@ void GameManager::render()
         selectedPlanet->drawOrbitPath(window, planets);
     }
 
-    // Draw trajectory only if in rocket mode
-    if (activeVehicleManager->getActiveVehicleType() == VehicleType::ROCKET) {
+    // Replace with this null-checked version:
+    if (activeVehicleManager &&
+        activeVehicleManager->getActiveVehicleType() == VehicleType::ROCKET &&
+        activeVehicleManager->getRocket()) {
         activeVehicleManager->getRocket()->drawTrajectory(window, planets,
             GameConstants::TRAJECTORY_TIME_STEP, GameConstants::TRAJECTORY_STEPS, false);
     }

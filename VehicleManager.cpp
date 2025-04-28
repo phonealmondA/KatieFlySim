@@ -5,7 +5,9 @@
 #include <iostream>
 
 VehicleManager::VehicleManager(sf::Vector2f initialPos, const std::vector<Planet*>& planetList)
-    : activeVehicle(VehicleType::ROCKET)
+    : activeVehicle(VehicleType::ROCKET),
+    rocket(nullptr),  // Initialize to null first
+    car(nullptr)      // Initialize to null first
 {
     try {
         // First initialize rockets and cars
@@ -31,8 +33,13 @@ VehicleManager::VehicleManager(sf::Vector2f initialPos, const std::vector<Planet
         std::cerr << "Exception in VehicleManager constructor: " << e.what() << std::endl;
 
         // Make sure rocket and car are properly initialized
-        if (!rocket) rocket = std::make_unique<Rocket>(initialPos, sf::Vector2f(0, 0));
-        if (!car) car = std::make_unique<Car>(initialPos, sf::Vector2f(0, 0));
+        try {
+            if (!rocket) rocket = std::make_unique<Rocket>(initialPos, sf::Vector2f(0, 0));
+            if (!car) car = std::make_unique<Car>(initialPos, sf::Vector2f(0, 0));
+        }
+        catch (const std::exception& e2) {
+            std::cerr << "Failed to create vehicles: " << e2.what() << std::endl;
+        }
 
         // Clear any potentially problematic planets
         planets.clear();
@@ -156,27 +163,49 @@ void VehicleManager::draw(sf::RenderWindow& window) {
 
     if (activeVehicle == VehicleType::ROCKET) {
         if (rocket) {
-            rocket->draw(window);
+            try {
+                rocket->draw(window);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception drawing rocket: " << e.what() << std::endl;
+            }
         }
     }
     else {
         if (car) {
-            car->draw(window);
+            try {
+                car->draw(window);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception drawing car: " << e.what() << std::endl;
+            }
         }
     }
 }
 
 void VehicleManager::drawWithConstantSize(sf::RenderWindow& window, float zoomLevel) {
+    // Multiple safety checks
     if (!window.isOpen()) return;
 
+    // Check that rocket and car pointers are valid before proceeding
     if (activeVehicle == VehicleType::ROCKET) {
         if (rocket) {
-            rocket->drawWithConstantSize(window, zoomLevel);
+            try {
+                rocket->drawWithConstantSize(window, zoomLevel);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception drawing rocket: " << e.what() << std::endl;
+            }
         }
     }
-    else {
+    else if (activeVehicle == VehicleType::CAR) {
         if (car) {
-            car->drawWithConstantSize(window, zoomLevel);
+            try {
+                car->drawWithConstantSize(window, zoomLevel);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception drawing car: " << e.what() << std::endl;
+            }
         }
     }
 }
@@ -184,12 +213,22 @@ void VehicleManager::drawWithConstantSize(sf::RenderWindow& window, float zoomLe
 void VehicleManager::applyThrust(float amount) {
     if (activeVehicle == VehicleType::ROCKET) {
         if (rocket) {
-            rocket->applyThrust(amount);
+            try {
+                rocket->applyThrust(amount);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception applying thrust: " << e.what() << std::endl;
+            }
         }
     }
     else {
         if (car) {
-            car->accelerate(amount);
+            try {
+                car->accelerate(amount);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception accelerating car: " << e.what() << std::endl;
+            }
         }
     }
 }
@@ -197,12 +236,22 @@ void VehicleManager::applyThrust(float amount) {
 void VehicleManager::rotate(float amount) {
     if (activeVehicle == VehicleType::ROCKET) {
         if (rocket) {
-            rocket->rotate(amount);
+            try {
+                rocket->rotate(amount);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception rotating rocket: " << e.what() << std::endl;
+            }
         }
     }
     else {
         if (car) {
-            car->rotate(amount);
+            try {
+                car->rotate(amount);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception rotating car: " << e.what() << std::endl;
+            }
         }
     }
 }
@@ -212,7 +261,12 @@ void VehicleManager::drawVelocityVector(sf::RenderWindow& window, float scale) {
 
     if (activeVehicle == VehicleType::ROCKET) {
         if (rocket) {
-            rocket->drawVelocityVector(window, scale);
+            try {
+                rocket->drawVelocityVector(window, scale);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception drawing velocity vector: " << e.what() << std::endl;
+            }
         }
     }
     // Car doesn't have a velocity vector display
@@ -228,21 +282,26 @@ GameObject* VehicleManager::getActiveVehicle() {
 }
 
 void VehicleManager::updatePlanets(const std::vector<Planet*>& newPlanets) {
-    // Update the internal planets vector with the new set of planets
-    planets.clear();
-    for (auto* planet : newPlanets) {
-        if (planet) {
-            planets.push_back(planet);
+    try {
+        // Update the internal planets vector with the new set of planets
+        planets.clear();
+        for (auto* planet : newPlanets) {
+            if (planet) {
+                planets.push_back(planet);
+            }
+        }
+
+        // Update the planet references in rocket
+        if (rocket) {
+            rocket->setNearbyPlanets(planets);
+        }
+
+        // Update in car if needed
+        if (car) {
+            car->checkGrounding(planets);
         }
     }
-
-    // Update the planet references in rocket
-    if (rocket) {
-        rocket->setNearbyPlanets(planets);
-    }
-
-    // Update in car if needed
-    if (car) {
-        car->checkGrounding(planets);
+    catch (const std::exception& e) {
+        std::cerr << "Exception in updatePlanets: " << e.what() << std::endl;
     }
 }

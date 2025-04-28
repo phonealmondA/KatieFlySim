@@ -77,6 +77,7 @@ bool NetworkManager::joinGame(const sf::IpAddress& address, unsigned short port)
 
     std::cout << "Connecting to " << address.toString() << ":" << port << "..." << std::endl;
 
+
     // Set a timeout for connection attempts
     serverConnection.setBlocking(true);
     sf::Socket::Status status = serverConnection.connect(address, port, sf::seconds(5));

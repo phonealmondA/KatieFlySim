@@ -101,19 +101,30 @@ decreaseMassButton(
     )
 {
     // Constructor body - can be empty
-}
-void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*>& planets, float deltaTime)
+}void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*>& planets, float deltaTime)
 {
+    // Only update if we have a valid vehicle manager
+    if (!vehicleManager) {
+        // Clear stored pointer to prevent stale references
+        activeVehicleManager = nullptr;
+        return;
+    }
+
     // Store the current vehicle manager
     activeVehicleManager = vehicleManager;
 
-    // Only update if we have a valid vehicle manager
-    if (!vehicleManager) return;
+    // Safe planets check
+    if (planets.empty()) {
+        // Don't try to find planets if the vector is empty
+        nearestPlanet = nullptr;
+        selectedPlanet = nullptr;
+        return;
+    }
 
-    // Find nearest planet for planet info display
+    // Find nearest planet for planet info display - with null check first
     nearestPlanet = findNearestPlanet(vehicleManager, planets);
 
-    // If no planet is manually selected, use the nearest
+    // If no planet is manually selected, use the nearest (with null checks)
     if (!selectedPlanet) {
         selectedPlanet = nearestPlanet;
     }
@@ -121,7 +132,7 @@ void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*
         // Check if the selected planet still exists in the planets vector
         bool found = false;
         for (auto* planet : planets) {
-            if (planet == selectedPlanet) {
+            if (planet && planet == selectedPlanet) {
                 found = true;
                 break;
             }
@@ -173,40 +184,47 @@ void UIManager::update(VehicleManager* vehicleManager, const std::vector<Planet*
         fuelTransferTimer = 0.0f;
     }
 
-
-
-    // Update UI panels
-    updateRocketInfo(vehicleManager);
-    updatePlanetInfo(vehicleManager, planets);
-    updateOrbitInfo(vehicleManager, planets);
-    updateThrustMetrics(vehicleManager, planets);
-    updateControlsInfo();
+    // Update UI panels - wrap with try-catch to prevent crashes
+    try {
+        updateRocketInfo(vehicleManager);
+        updatePlanetInfo(vehicleManager, planets);
+        updateOrbitInfo(vehicleManager, planets);
+        updateThrustMetrics(vehicleManager, planets);
+        updateControlsInfo();
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Exception in UI panel updates: " << e.what() << std::endl;
+    }
 
     // Update button states - check if mouse is hovering over buttons
-    sf::Vector2i mousePosition = sf::Mouse::getPosition(window);
-    sf::Vector2f mousePosView = window.mapPixelToCoords(mousePosition, uiView);
+    try {
+        sf::Vector2i mousePosition = sf::Mouse::getPosition(window);
+        sf::Vector2f mousePosView = window.mapPixelToCoords(mousePosition, uiView);
 
-    increaseMassButton.update(mousePosView);
-    decreaseMassButton.update(mousePosView);
+        increaseMassButton.update(mousePosView);
+        decreaseMassButton.update(mousePosView);
 
-    // Also update the engine upgrade buttons
-    increaseThrustButton.update(mousePosView);
-    increaseEfficiencyButton.update(mousePosView);
+        // Also update the engine upgrade buttons
+        increaseThrustButton.update(mousePosView);
+        increaseEfficiencyButton.update(mousePosView);
 
-    // Check for button clicks
-    if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
-        // Only allow fuel transfer buttons if within range
-        if (withinTransferDistance) {
-            increaseMassButton.handleClick();
-            decreaseMassButton.handleClick();
+        // Check for button clicks
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
+            // Only allow fuel transfer buttons if within range
+            if (withinTransferDistance) {
+                increaseMassButton.handleClick();
+                decreaseMassButton.handleClick();
+            }
+
+            // Engine upgrade buttons aren't distance-limited
+            increaseThrustButton.handleClick();
+            increaseEfficiencyButton.handleClick();
         }
-
-        // Engine upgrade buttons aren't distance-limited
-        increaseThrustButton.handleClick();
-        increaseEfficiencyButton.handleClick();
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Exception in button updates: " << e.what() << std::endl;
     }
 }
-
 
 
 
