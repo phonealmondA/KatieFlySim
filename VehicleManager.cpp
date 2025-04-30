@@ -183,32 +183,41 @@ void VehicleManager::draw(sf::RenderWindow& window) {
     }
 }
 
-void VehicleManager::drawWithConstantSize(sf::RenderWindow& window, float zoomLevel) {
+
+void VehicleManager::drawWithConstantSize(sf::RenderWindow& window, float zoomLevel)
+{
     // Multiple safety checks
     if (!window.isOpen()) return;
 
     // Check that rocket and car pointers are valid before proceeding
     if (activeVehicle == VehicleType::ROCKET) {
-        if (rocket) {
-            try {
-                rocket->drawWithConstantSize(window, zoomLevel);
-            }
-            catch (const std::exception& e) {
-                std::cerr << "Exception drawing rocket: " << e.what() << std::endl;
-            }
+        if (!rocket) {
+            std::cerr << "Warning: Attempted to draw null rocket in drawWithConstantSize" << std::endl;
+            return; // Early return if rocket is null
+        }
+
+        try {
+            rocket->drawWithConstantSize(window, zoomLevel);
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Exception drawing rocket: " << e.what() << std::endl;
         }
     }
     else if (activeVehicle == VehicleType::CAR) {
-        if (car) {
-            try {
-                car->drawWithConstantSize(window, zoomLevel);
-            }
-            catch (const std::exception& e) {
-                std::cerr << "Exception drawing car: " << e.what() << std::endl;
-            }
+        if (!car) {
+            std::cerr << "Warning: Attempted to draw null car in drawWithConstantSize" << std::endl;
+            return; // Early return if car is null
+        }
+
+        try {
+            car->drawWithConstantSize(window, zoomLevel);
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Exception drawing car: " << e.what() << std::endl;
         }
     }
 }
+
 
 void VehicleManager::applyThrust(float amount) {
     if (activeVehicle == VehicleType::ROCKET) {

@@ -414,12 +414,21 @@ void NetworkManager::update() {
                             uint32_t playerId;
                             if (packet >> playerId) {
                                 if (gameClient) {
-                                    gameClient->setLocalPlayerId(static_cast<int>(playerId));
                                     std::cout << "Received player ID from server: " << playerId << std::endl;
-                                    connectionState = ConnectionState::CONNECTED; // Now fully connected
+
+                                    // Set the player ID and update connection state
+                                    gameClient->setLocalPlayerId(static_cast<int>(playerId));
+
+                                    // Explicitly transition to waiting for state
+                                    connectionState = ConnectionState::CONNECTED;
+                                    std::cout << "Connection state updated to waiting for game state" << std::endl;
+                                }
+                                else {
+                                    std::cerr << "Error: Received player ID but gameClient is null" << std::endl;
                                 }
                             }
                         }
+                        break;
                         break;
                         case MessageType::GAME_STATE:
                         {

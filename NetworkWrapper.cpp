@@ -138,13 +138,14 @@ bool NetworkWrapper::initialize(bool host, const std::string& address, unsigned 
     }
 }
 
+
 void NetworkWrapper::update(float deltaTime)
 {
     try {
         // Update network manager
         networkManager.update();
 
-        // Update game components
+        // Update game components based on connection state
         if (isHost && gameServer) {
             gameServer->update(deltaTime);
 
@@ -152,7 +153,23 @@ void NetworkWrapper::update(float deltaTime)
             networkManager.sendGameState(gameServer->getGameState());
         }
         else if (!isHost && gameClient) {
-            gameClient->update(deltaTime);
+            // Check if we've received a player ID yet
+            if (gameClient->getLocalPlayerId() > 0) {
+                // We have an ID, check if we're fully connected
+                if (gameClient->isConnected()) {
+                    // Fully connected, update normally
+                    gameClient->update(deltaTime);
+                }
+                else if (gameClient->isWaitingForState()) {
+                    // Waiting for initial state, don't update yet
+                    // but could add a timeout check here
+                    std::cout << "Waiting for initial game state..." << std::endl;
+                }
+            }
+            else {
+                // Still waiting for player ID
+                std::cout << "Waiting for player ID from server..." << std::endl;
+            }
         }
     }
     catch (const std::exception& e) {

@@ -63,8 +63,7 @@ public:
 
     // Set latency compensation window
     void setLatencyCompensation(float value);
-
-    void setLocalPlayerId(int id) { localPlayerId = id; }
+    void setLocalPlayerId(int id);
     int getLocalPlayerId() const { return localPlayerId; }
 
     VehicleManager* getLocalPlayer() { return localPlayer; }

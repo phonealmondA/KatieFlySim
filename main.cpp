@@ -69,7 +69,6 @@ enum class AppConnectionState {
     WAITING_FOR_DATA,
     CONNECTED
 };
-
 int main(int argc, char* argv[])
 {
     // Initialize SFML window
@@ -292,11 +291,13 @@ int main(int argc, char* argv[])
     // Clock for tracking time between frames
     sf::Clock clock;
     sf::Clock connectionTimeoutClock;
+    sf::Clock waitingForRocketClock; // New clock for tracking how long we wait for rocket data
 
     // Connection timeout parameters
     const float connectionTimeout = 10.0f; // 10 seconds to establish connection
     const int maxConnectionAttempts = 20;
     int connectionAttempts = 0;
+    bool rocketWaitMessageShown = false; // Flag to prevent repeated messages
 
     // Main game loop
     while (window.isOpen())
@@ -310,17 +311,42 @@ int main(int argc, char* argv[])
                 networkWrapper.update(deltaTime);
 
                 // Check if client connection state has changed
-                if (!isHost && connectionState != AppConnectionState::CONNECTED) {
+                if (!isHost) {
                     GameClient* gameClient = networkWrapper.getClient();
                     bool networkConnected = networkWrapper.getNetworkManager()->isConnected();
 
+                    // Check if we have a valid client and connection
                     if (networkConnected && gameClient) {
+                        // Check if we have a local player and planets
                         if (gameClient->getLocalPlayer() && !gameClient->getPlanets().empty()) {
-                            // We have a local player and planets - transition to connected
-                            activeVehicleManager = gameClient->getLocalPlayer();
-                            planets = gameClient->getPlanets();
-                            connectionState = AppConnectionState::CONNECTED;
-                            std::cout << "Client fully connected with player and planet data" << std::endl;
+                            // Make sure we have a valid rocket before considering fully connected
+                            VehicleManager* localPlayer = gameClient->getLocalPlayer();
+                            if (localPlayer && localPlayer->getRocket()) {
+                                // We have a complete player with rocket - transition to connected
+                                activeVehicleManager = localPlayer;
+                                planets = gameClient->getPlanets();
+                                connectionState = AppConnectionState::CONNECTED;
+                                std::cout << "Client fully connected with player, rocket, and planet data" << std::endl;
+                                waitingForRocketClock.restart(); // Reset the rocket waiting clock
+                            }
+                            else {
+                                // We have a player but no rocket yet
+                                if (connectionState != AppConnectionState::WAITING_FOR_DATA) {
+                                    connectionState = AppConnectionState::WAITING_FOR_DATA;
+                                    std::cout << "Connected but waiting for rocket data..." << std::endl;
+                                    waitingForRocketClock.restart(); // Start the rocket waiting clock
+                                }
+
+                                // If we've been waiting too long for the rocket, log warning
+                                if (waitingForRocketClock.getElapsedTime().asSeconds() > 5.0f && !rocketWaitMessageShown) {
+                                    std::cerr << "Warning: Still waiting for rocket after 5 seconds" << std::endl;
+                                    rocketWaitMessageShown = true;
+                                }
+
+                                // Update references anyway to potentially get newer data
+                                activeVehicleManager = localPlayer;
+                                planets = gameClient->getPlanets();
+                            }
                         }
                         else if (connectionState == AppConnectionState::CONNECTING) {
                             // Network is connected but waiting for data
@@ -379,6 +405,52 @@ int main(int argc, char* argv[])
             }
         }
 
+        // Check for valid rocket if we're connected but don't have one
+        if (connectionState == AppConnectionState::CONNECTED &&
+            activeVehicleManager &&
+            (!activeVehicleManager->getRocket() || activeVehicleManager->getActiveVehicleType() != VehicleType::ROCKET)) {
+
+            if (!rocketWaitMessageShown) {
+                std::cerr << "Connected but rocket is null or not active. Waiting for valid rocket..." << std::endl;
+                rocketWaitMessageShown = true;
+            }
+
+            // Get updated references if in multiplayer
+            if (isMultiplayer) {
+                if (isHost) {
+                    GameServer* gameServer = networkWrapper.getServer();
+                    if (gameServer) {
+                        activeVehicleManager = gameServer->getPlayer(0);
+                    }
+                }
+                else {
+                    GameClient* gameClient = networkWrapper.getClient();
+                    if (gameClient) {
+                        activeVehicleManager = gameClient->getLocalPlayer();
+                    }
+                }
+            }
+
+            // Show a special connection UI for this case
+            window.clear(sf::Color(20, 20, 50)); // Dark blue background
+
+            sf::Text waitingText(font, "Connected but waiting for rocket data...");
+            waitingText.setCharacterSize(24);
+            waitingText.setFillColor(sf::Color::White);
+
+            // Center the text
+            sf::FloatRect textBounds = waitingText.getLocalBounds();
+            waitingText.setPosition(sf::Vector2f(
+                (window.getSize().x - textBounds.size.x) / 2,
+                (window.getSize().y - textBounds.size.y) / 2));
+
+            window.draw(waitingText);
+            window.display();
+
+            // Skip the rest of the loop
+            continue;
+        }
+
         // Show connection UI if not fully connected
         if (connectionState != AppConnectionState::CONNECTED) {
             window.clear(sf::Color(20, 20, 50)); // Dark blue background
@@ -403,8 +475,9 @@ int main(int argc, char* argv[])
 
             // Center the text
             sf::FloatRect textBounds = connectingText.getLocalBounds();
-
-            connectingText.setPosition(sf::Vector2f((window.getSize().x - textBounds.size.x) / 2, (window.getSize().y - textBounds.size.y) / 2));
+            connectingText.setPosition(sf::Vector2f(
+                (window.getSize().x - textBounds.size.x) / 2,
+                (window.getSize().y - textBounds.size.y) / 2));
 
             window.draw(connectingText);
 
@@ -419,8 +492,9 @@ int main(int argc, char* argv[])
             statusText.setString(statusMessage);
 
             sf::FloatRect statusBounds = statusText.getLocalBounds();
-
-            statusText.setPosition(sf::Vector2f((window.getSize().x - statusBounds.size.x) / 2, (window.getSize().y - statusBounds.size.y) / 2 + 40));
+            statusText.setPosition(sf::Vector2f(
+                (window.getSize().x - statusBounds.size.x) / 2,
+                (window.getSize().y - statusBounds.size.y) / 2 + 40));
 
             window.draw(statusText);
             window.display();
@@ -452,6 +526,12 @@ int main(int argc, char* argv[])
         // Final pointer safety check before proceeding
         if (!activeVehicleManager || planets.empty()) {
             std::cerr << "Missing game objects despite connection, skipping frame" << std::endl;
+            continue;
+        }
+
+        // Extra check for valid rocket if we're going to render
+        if (!activeVehicleManager->getRocket()) {
+            std::cerr << "Rocket is null despite active vehicle manager, skipping frame" << std::endl;
             continue;
         }
 
@@ -513,41 +593,50 @@ int main(int argc, char* argv[])
             std::cerr << "Exception in UI update: " << e.what() << std::endl;
         }
 
-        // Render scene
+        // Render scene - with enhanced safety checks
         try {
             // Clear the window with a dark background
             window.clear(sf::Color(20, 20, 50));
 
-            // Render game elements
-            gameManager.render();
-
-            // Draw trajectory and other elements safely
-            if (activeVehicleManager &&
-                activeVehicleManager->getActiveVehicleType() == VehicleType::ROCKET &&
-                activeVehicleManager->getRocket()) {
+            // Only render game elements if we have valid objects
+            if (activeVehicleManager && activeVehicleManager->getRocket() && !planets.empty()) {
+                // Render game elements
                 try {
-                    activeVehicleManager->getRocket()->drawTrajectory(window, planets,
-                        GameConstants::TRAJECTORY_TIME_STEP, GameConstants::TRAJECTORY_STEPS, false);
+                    gameManager.render();
                 }
                 catch (const std::exception& e) {
-                    std::cerr << "Exception drawing trajectory: " << e.what() << std::endl;
+                    std::cerr << "Exception in game rendering: " << e.what() << std::endl;
+                }
+
+                // Draw trajectory and other elements safely
+                if (activeVehicleManager->getActiveVehicleType() == VehicleType::ROCKET) {
+                    try {
+                        activeVehicleManager->getRocket()->drawTrajectory(window, planets,
+                            GameConstants::TRAJECTORY_TIME_STEP, GameConstants::TRAJECTORY_STEPS, false);
+                    }
+                    catch (const std::exception& e) {
+                        std::cerr << "Exception drawing trajectory: " << e.what() << std::endl;
+                    }
                 }
             }
+            else {
+                std::cerr << "Missing required objects for rendering, skipping game render" << std::endl;
+            }
+
+            // Render UI
+            try {
+                uiManager.render();
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Exception in UI rendering: " << e.what() << std::endl;
+            }
+
+            // Display the frame
+            window.display();
         }
         catch (const std::exception& e) {
             std::cerr << "Exception in rendering: " << e.what() << std::endl;
         }
-
-        // Render UI
-        try {
-            uiManager.render();
-        }
-        catch (const std::exception& e) {
-            std::cerr << "Exception in UI rendering: " << e.what() << std::endl;
-        }
-
-        // Display the frame
-        window.display();
     }
 
     // Cleanup happens automatically via destructors

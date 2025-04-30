@@ -148,7 +148,7 @@ void GameClient::processGameState(const GameState& state) {
     try {
         // Don't process empty states
         if (state.planets.empty()) {
-            std::cerr << "Received empty game state" << std::endl;
+            std::cerr << "Received empty game state, ignoring" << std::endl;
             return;
         }
 
@@ -158,9 +158,12 @@ void GameClient::processGameState(const GameState& state) {
 
         // Update connection state if this is our first state
         if (!hasReceivedInitialState) {
+            std::cout << "Received initial game state with " << state.planets.size() << " planets and "
+                << state.rockets.size() << " rockets" << std::endl;
+
             connectionState = ClientConnectionState::CONNECTED;
             hasReceivedInitialState = true;
-            std::cout << "Received initial game state" << std::endl;
+            std::cout << "Client now fully connected and ready for gameplay" << std::endl;
         }
 
         // Process planets - ensure we have the right number of planets
@@ -210,7 +213,7 @@ void GameClient::processGameState(const GameState& state) {
                     continue;
                 }
             }
-
+            // In the processGameState method in GameClient.cpp, after creating the local player:
             if (rocketState.playerId == localPlayerId) {
                 // This is our local player
                 if (!localPlayer) {
@@ -219,6 +222,17 @@ void GameClient::processGameState(const GameState& state) {
                         localPlayer = new VehicleManager(rocketState.position, planets);
                         simulator.addVehicleManager(localPlayer);
                         std::cout << "Created local player with ID: " << localPlayerId << std::endl;
+
+                        // Verify the rocket was actually created
+                        if (!localPlayer->getRocket()) {
+                            std::cerr << "ERROR: Local player created but rocket is null!" << std::endl;
+                            delete localPlayer;
+                            localPlayer = nullptr;
+                            continue;
+                        }
+                        else {
+                            std::cout << "Successfully created rocket for local player" << std::endl;
+                        }
                     }
                     catch (const std::exception& e) {
                         std::cerr << "Exception creating local player: " << e.what() << std::endl;
@@ -226,35 +240,13 @@ void GameClient::processGameState(const GameState& state) {
                     }
                 }
 
+                // And add more explicit verification after updating the rocket
                 if (localPlayer && localPlayer->getRocket()) {
-                    // Calculate position difference
-                    sf::Vector2f posDiff = rocketState.position - localPlayer->getRocket()->getPosition();
-                    float distance = std::sqrt(posDiff.x * posDiff.x + posDiff.y * posDiff.y);
-
-                    // Improved client-side prediction with smoothing
-                    if (distance > 20.0f) {
-                        // Hard correction for big differences
-                        localPlayer->getRocket()->setPosition(rocketState.position);
-                        localPlayer->getRocket()->setVelocity(rocketState.velocity);
-                    }
-                    else if (distance > 5.0f) {
-                        // Smooth interpolation for small differences
-                        sf::Vector2f correctionVector = rocketState.position - localPlayer->getRocket()->getPosition();
-                        localPlayer->getRocket()->setPosition(
-                            localPlayer->getRocket()->getPosition() + correctionVector * 0.2f);
-
-                        // Also smoothly adjust velocity
-                        sf::Vector2f velCorrection = rocketState.velocity - localPlayer->getRocket()->getVelocity();
-                        localPlayer->getRocket()->setVelocity(
-                            localPlayer->getRocket()->getVelocity() + velCorrection * 0.2f);
-                    }
-
-                    // Keep local rotation control for better responsiveness
-                    // Only update server rotation if significantly different
-                    float rotDiff = std::abs(rocketState.rotation - localPlayer->getRocket()->getRotation());
-                    if (rotDiff > 45.0f) {
-                        localPlayer->getRocket()->setRotation(rocketState.rotation);
-                    }
+                    std::cout << "Updated local rocket position: " << rocketState.position.x << ", "
+                        << rocketState.position.y << std::endl;
+                }
+                else {
+                    std::cerr << "ERROR: Local player exists but rocket is null after state update" << std::endl;
                 }
             }
             else {
@@ -350,15 +342,17 @@ void GameClient::processGameState(const GameState& state) {
     }
 }
 
+
+
 void GameClient::setLatencyCompensation(float value) {
     latencyCompensation = value;
 }
 
-//void GameClient::setLocalPlayerId(int id) {
-//    localPlayerId = id;
-//    connectionState = ClientConnectionState::WAITING_FOR_STATE;
-//    std::cout << "Local player ID set to: " << id << std::endl;
-//}
+void GameClient::setLocalPlayerId(int id) {
+    localPlayerId = id;
+    connectionState = ClientConnectionState::WAITING_FOR_STATE;
+    std::cout << "Local player ID set to: " << id << ", waiting for initial game state..." << std::endl;
+}
 
 PlayerInput GameClient::getLocalPlayerInput(float deltaTime) const {
     PlayerInput input;
