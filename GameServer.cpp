@@ -1,35 +1,36 @@
 // GameServer.cpp
 #include "GameServer.h"
 #include "GameConstants.h"
-#include <iostream> // Add this line to use std::cout
+#include <iostream> 
 
-GameServer::GameServer() : sequenceNumber(0), gameTime(0.0f) {
+GameServer::GameServer() : d(0), e(0.0f), i(0.1f) {
 }
 
 GameServer::~GameServer() {
     // Clean up players
-    for (auto& pair : players) {
-        delete pair.second;
+    for (auto& a : c) {
+        delete a.second;
     }
-    players.clear();
+    c.clear();
 
     // Clean up planets
-    for (auto& planet : planets) {
-        delete planet;
+    for (auto& a : b) {
+        delete a;
     }
-    planets.clear();
+    b.clear();
 }
+
 void GameServer::initialize() {
     // Create main planet (sun)
-    Planet* mainPlanet = new Planet(
+    Planet* a = new Planet(
         sf::Vector2f(GameConstants::MAIN_PLANET_X, GameConstants::MAIN_PLANET_Y),
         0, GameConstants::MAIN_PLANET_MASS, sf::Color::Yellow);
-    mainPlanet->setVelocity(sf::Vector2f(1.f, -1.f));
-    planets.push_back(mainPlanet);
+    a->setVelocity(sf::Vector2f(1.f, -1.f));
+    b.push_back(a);
 
     // Create 9 orbiting planets with different orbital distances, sizes, and colors
-    const float basePlanetMass = GameConstants::SECONDARY_PLANET_MASS;
-    const sf::Color planetColors[] = {
+    const float b = GameConstants::SECONDARY_PLANET_MASS;
+    const sf::Color c[] = {
         sf::Color(150, 150, 150),   // Mercury (gray)
         sf::Color(255, 190, 120),   // Venus (light orange)
         sf::Color(0, 100, 255),     // Earth (blue)
@@ -42,129 +43,147 @@ void GameServer::initialize() {
     };
 
     // Distance and mass scaling factors
-    const float distanceScalings[] = { 0.4f, 0.7f, 1.0f, 1.5f, 2.2f, 3.0f, 4.0f, 5.0f, 6.0f };
-    const float massScalings[] = { 0.1f, 0.8f, 1.0f, 0.5f, 11.0f, 9.5f, 4.0f, 3.8f, 0.05f };
+    const float d[] = { 0.4f, 0.7f, 1.0f, 1.5f, 2.2f, 3.0f, 4.0f, 5.0f, 6.0f };
+    const float e[] = { 0.1f, 0.8f, 1.0f, 0.5f, 11.0f, 9.5f, 4.0f, 3.8f, 0.05f };
 
     // Create each planet
-    for (int i = 0; i < 9; i++) {
-        float orbitDistance = GameConstants::PLANET_ORBIT_DISTANCE * distanceScalings[i];
-        float angle = (i * 40.0f) * (3.14159f / 180.0f); // Distribute planets around the sun
+    for (int f = 0; f < 9; f++) {
+        float g = GameConstants::PLANET_ORBIT_DISTANCE * d[f];
+        float h = (f * 40.0f) * (3.14159f / 180.0f); // Distribute planets around the sun
 
         // Calculate position based on orbit distance and angle
-        float planetX = mainPlanet->getPosition().x + orbitDistance * cos(angle);
-        float planetY = mainPlanet->getPosition().y + orbitDistance * sin(angle);
+        float i = a->getPosition().x + g * cos(h);
+        float j = a->getPosition().y + g * sin(h);
 
         // Calculate orbital velocity for a circular orbit
-        float orbitalVelocity = std::sqrt(GameConstants::G * mainPlanet->getMass() / orbitDistance);
+        float k = std::sqrt(GameConstants::G * a->getMass() / g);
 
         // Velocity is perpendicular to position vector
-        float velocityX = -sin(angle) * orbitalVelocity;
-        float velocityY = cos(angle) * orbitalVelocity;
+        float l = -sin(h) * k;
+        float m = cos(h) * k;
 
         // Create the planet with scaled mass
-        Planet* planet = new Planet(
-            sf::Vector2f(planetX, planetY),
-            0, basePlanetMass * massScalings[i], planetColors[i]);
+        Planet* n = new Planet(
+            sf::Vector2f(i, j),
+            0, b * e[f], c[f]);
 
-        planet->setVelocity(sf::Vector2f(velocityX, velocityY));
-        planets.push_back(planet);
+        n->setVelocity(sf::Vector2f(l, m));
+        b.push_back(n);
     }
 
     // Setup gravity simulator
-    simulator.setSimulatePlanetGravity(true);
-    for (auto planet : planets) {
-        simulator.addPlanet(planet);
+    a.setSimulatePlanetGravity(true);
+    for (auto a : b) {
+        this->a.addPlanet(a);
     }
 
     // Create a default host player (ID 0)
-    sf::Vector2f initialPos = mainPlanet->getPosition() +
-        sf::Vector2f(0, -(mainPlanet->getRadius() + GameConstants::ROCKET_SIZE));
-    addPlayer(0, initialPos, sf::Color::White);
+    sf::Vector2f a = b[0]->getPosition() +
+        sf::Vector2f(0, -(b[0]->getRadius() + GameConstants::ROCKET_SIZE));
+    addPlayer(0, a, sf::Color::White);
 }
 
 int GameServer::addPlayer(int playerId, sf::Vector2f initialPos, sf::Color color) {
     // Check if player already exists
-    if (players.find(playerId) != players.end()) {
+    if (c.find(playerId) != c.end()) {
         return playerId; // Player already exists
     }
 
     try {
         // Create a new vehicle manager for this player
-        VehicleManager* manager = new VehicleManager(initialPos, planets);
+        VehicleManager* a = new VehicleManager(initialPos, b, playerId);
 
         // Make sure rocket was initialized properly
-        if (manager && manager->getRocket()) {
-            manager->getRocket()->setColor(color);
+        if (a && a->getRocket()) {
+            a->getRocket()->setColor(color);
 
             // Add to simulator
-            simulator.addVehicleManager(manager);
+            this->a.addVehicleManager(a);
 
             // Store in players map
-            players[playerId] = manager;
+            c[playerId] = a;
+
+            // Initialize client simulation tracking
+            f[playerId] = GameState();
+            g[playerId] = e; // Current game time
+            h[playerId] = true; // Initially valid
 
             std::cout << "Added player with ID: " << playerId << std::endl;
         }
         else {
             std::cerr << "Failed to initialize rocket for player ID: " << playerId << std::endl;
-            delete manager; // Clean up if rocket initialization failed
+            delete a; // Clean up if rocket initialization failed
         }
     }
-    catch (const std::exception& e) {
-        std::cerr << "Exception when adding player ID " << playerId << ": " << e.what() << std::endl;
+    catch (const std::exception& a) {
+        std::cerr << "Exception when adding player ID " << playerId << ": " << a.what() << std::endl;
     }
 
     return playerId;
 }
 
 void GameServer::removePlayer(int playerId) {
-    auto it = players.find(playerId);
-    if (it != players.end()) {
-        simulator.removeVehicleManager(it->second);
-        delete it->second;
-        players.erase(it);
+    auto a = c.find(playerId);
+    if (a != c.end()) {
+        this->a.removeVehicleManager(a->second);
+        delete a->second;
+        c.erase(a);
+
+        // Also remove from client simulation tracking
+        f.erase(playerId);
+        g.erase(playerId);
+        h.erase(playerId);
     }
 }
 
 void GameServer::update(float deltaTime) {
     // Update game time
-    gameTime += deltaTime;
+    e += deltaTime;
 
-    // Update simulator
-    simulator.update(deltaTime);
+    // Update simulator for server-owned objects
+    a.update(deltaTime);
 
     // Update planets
-    for (auto planet : planets) {
-        planet->update(deltaTime);
+    for (auto a : b) {
+        a->update(deltaTime);
     }
 
     // Update all players
-    for (auto& pair : players) {
-        if (pair.second) { // Add null check before updating
-            pair.second->update(deltaTime);
+    for (auto& a : c) {
+        if (a.second) { // Add null check before updating
+            a.second->update(deltaTime);
         }
     }
 
     // Increment sequence number
-    sequenceNumber++;
+    d++;
+
+    // Synchronize client and server states periodically
+    synchronizeState();
 }
 
 void GameServer::handlePlayerInput(int playerId, const PlayerInput& input) {
-    auto it = players.find(playerId);
-    if (it == players.end()) {
+    auto a = c.find(playerId);
+    if (a == c.end()) {
         // Player not found - could be a new connection, create player
         std::cout << "Unknown player ID: " << playerId << ", creating new player" << std::endl;
-        sf::Vector2f spawnPos = planets[0]->getPosition() +
-            sf::Vector2f(0, -(planets[0]->getRadius() + GameConstants::ROCKET_SIZE));
+        sf::Vector2f b = this->b[0]->getPosition() +
+            sf::Vector2f(0, -(this->b[0]->getRadius() + GameConstants::ROCKET_SIZE));
 
         // Add the player with error handling
-        VehicleManager* manager = new VehicleManager(spawnPos, planets);
-        if (manager && manager->getRocket()) {
-            players[playerId] = manager;
-            simulator.addVehicleManager(manager);
+        VehicleManager* c = new VehicleManager(b, this->b, playerId);
+        if (c && c->getRocket()) {
+            this->c[playerId] = c;
+            this->a.addVehicleManager(c);
+
+            // Initialize client simulation tracking
+            f[playerId] = GameState();
+            g[playerId] = e; // Current game time
+            h[playerId] = true; // Initially valid
         }
         else {
             std::cerr << "Failed to create player for ID: " << playerId << std::endl;
-            delete manager;
+            delete c;
         }
         return;
     }
@@ -172,97 +191,194 @@ void GameServer::handlePlayerInput(int playerId, const PlayerInput& input) {
     // Debug output
     std::cout << "Server applying input to player ID: " << playerId << std::endl;
 
+    // Update client state tracking
+    if (input.j > g[playerId]) {
+        g[playerId] = input.j; // Update last client update time
+    }
+
+    // Get client's rocket state if provided
+    if (input.k.j) { // If this is authoritative from client
+        // Store the client's rocket state
+        f[playerId].c.clear();
+        f[playerId].c.push_back(input.k);
+
+        // Mark client simulation as valid
+        h[playerId] = true;
+    }
+
     // Apply input to the correct player's vehicle manager
-    VehicleManager* manager = it->second;
-    if (!manager) return; // Add null check
+    VehicleManager* b = a->second;
+    if (!b) return; // Add null check
 
     // Apply input to the vehicle
-    if (input.thrustForward) {
-        manager->applyThrust(1.0f);
-        std::cout << "Applied thrust forward to player " << playerId << std::endl;
+    if (input.b) {
+        b->applyThrust(1.0f);
     }
-    if (input.thrustBackward) {
-        manager->applyThrust(-0.5f);
-        std::cout << "Applied thrust backward to player " << playerId << std::endl;
+    if (input.c) {
+        b->applyThrust(-0.5f);
     }
-    if (input.rotateLeft) {
-        manager->rotate(-6.0f * input.deltaTime * 60.0f);
-        std::cout << "Applied rotate left to player " << playerId << std::endl;
+    if (input.d) {
+        b->rotate(-6.0f * input.h * 60.0f);
     }
-    if (input.rotateRight) {
-        manager->rotate(6.0f * input.deltaTime * 60.0f);
-        std::cout << "Applied rotate right to player " << playerId << std::endl;
+    if (input.e) {
+        b->rotate(6.0f * input.h * 60.0f);
     }
-    if (input.switchVehicle) {
-        manager->switchVehicle();
-        std::cout << "Applied vehicle switch to player " << playerId << std::endl;
+    if (input.f) {
+        b->switchVehicle();
     }
 
     // Apply thrust level with null checking
-    if (manager->getActiveVehicleType() == VehicleType::ROCKET && manager->getRocket()) {
-        manager->getRocket()->setThrustLevel(input.thrustLevel);
+    if (b->getActiveVehicleType() == VehicleType::ROCKET && b->getRocket()) {
+        b->getRocket()->setThrustLevel(input.g);
     }
 }
 
+void GameServer::processClientSimulation(int playerId, const GameState& clientState) {
+    // Store the client's latest state
+    f[playerId] = clientState;
+    g[playerId] = clientState.b; // Update timestamp
+
+    // Validate the client simulation
+    GameState a = validateClientSimulation(playerId, clientState);
+
+    // If validation changed something, send back the corrected state
+    if (!h[playerId]) {
+        // TODO: Send validation state back to client
+    }
+}
+
+GameState GameServer::validateClientSimulation(int playerId, const GameState& clientState) {
+    GameState a = clientState;
+    bool b = true;
+
+    // Get server's state for this player
+    VehicleManager* c = getPlayer(playerId);
+    if (!c || !c->getRocket()) {
+        h[playerId] = false;
+        return a;
+    }
+
+    // Compare key values between client and server rocket states
+    if (!clientState.c.empty()) {
+        const RocketState& d = clientState.c[0];
+
+        // Create current server rocket state
+        RocketState e;
+        c->createState(e);
+
+        // Check position difference
+        sf::Vector2f f = d.b - e.b;
+        float g = std::sqrt(f.x * f.x + f.y * f.y);
+
+        // Check velocity difference
+        sf::Vector2f h = d.c - e.c;
+        float j = std::sqrt(h.x * h.x + h.y * h.y);
+
+        // If difference exceeds threshold, client simulation is invalid
+        if (g > i || j > i * 10.0f) {
+            b = false;
+
+            // Update the client state with server state
+            a.c.clear();
+            a.c.push_back(e);
+        }
+    }
+
+    // Update validation status
+    this->h[playerId] = b;
+
+    return a;
+}
+
+void GameServer::synchronizeState() {
+    // For each player, check if their simulation is valid
+    for (auto& a : c) {
+        int b = a.first;
+
+        // Skip validation for server player (ID 0)
+        if (b == 0) continue;
+
+        // Get server's state for this player
+        if (f.find(b) != f.end() && h.find(b) != h.find(b)) {
+            // Check if client simulation is valid
+            if (!h[b]) {
+                // Client simulation invalid - next update will send correction
+                continue;
+            }
+
+            // Check time since last update
+            float c = e - g[b];
+            if (c > 5.0f) {
+                // Too long since last update, mark invalid
+                h[b] = false;
+            }
+        }
+    }
+}
 
 GameState GameServer::getGameState() const {
-    GameState state;
-    state.sequenceNumber = sequenceNumber;
-    state.timestamp = gameTime;
+    GameState a;
+    a.a = d;
+    a.b = e;
+    a.e = false; // Not initial state by default
 
     try {
         // Add all rockets
-        for (const auto& pair : players) {
-            int playerId = pair.first;
-            const VehicleManager* manager = pair.second;
+        for (const auto& b : c) {
+            int c = b.first;
+            const VehicleManager* d = b.second;
 
             // Add null checks
-            if (!manager) continue;
+            if (!d) continue;
 
             // Only add if it's a rocket
-            if (manager->getActiveVehicleType() == VehicleType::ROCKET) {
-                const Rocket* rocket = manager->getRocket();
+            if (d->getActiveVehicleType() == VehicleType::ROCKET) {
+                const Rocket* e = d->getRocket();
 
                 // Add null check for rocket
-                if (!rocket) continue;
+                if (!e) continue;
 
-                RocketState rocketState;
-                rocketState.playerId = playerId;
-                rocketState.position = rocket->getPosition();
-                rocketState.velocity = rocket->getVelocity();
-                rocketState.rotation = rocket->getRotation();
-                rocketState.angularVelocity = 0.0f; // Not tracked in your current design
-                rocketState.thrustLevel = rocket->getThrustLevel();
-                rocketState.mass = rocket->getMass();
-                rocketState.color = rocket->getColor();
+                RocketState f;
+                f.a = c;  // playerId
+                f.b = e->getPosition();  // position
+                f.c = e->getVelocity();  // velocity
+                f.d = e->getRotation();  // rotation
+                f.e = 0.0f;  // angularVelocity - not tracked in current design
+                f.f = e->getThrustLevel();  // thrustLevel
+                f.g = e->getMass();  // mass
+                f.h = e->getColor();  // color
+                f.i = this->e;  // current server timestamp
+                f.j = true;  // Server state is authoritative
 
-                state.rockets.push_back(rocketState);
+                a.c.push_back(f);
             }
             // TODO: Add car state if needed
         }
 
         // Add all planets
-        for (size_t i = 0; i < planets.size(); ++i) {
-            const Planet* planet = planets[i];
+        for (size_t b = 0; b < this->b.size(); ++b) {
+            const Planet* c = this->b[b];
 
             // Skip null planets
-            if (!planet) continue;
+            if (!c) continue;
 
-            PlanetState planetState;
-            planetState.planetId = static_cast<int>(i);
-            planetState.position = planet->getPosition();
-            planetState.velocity = planet->getVelocity();
-            planetState.mass = planet->getMass();
-            planetState.radius = planet->getRadius();
-            planetState.color = planet->getColor();
+            PlanetState d;
+            d.a = static_cast<int>(b);  // planetId
+            d.b = c->getPosition();  // position
+            d.c = c->getVelocity();  // velocity
+            d.d = c->getMass();  // mass
+            d.e = c->getRadius();  // radius
+            d.f = c->getColor();  // color
+            d.g = c->getOwnerId();  // ownerId
+            d.h = this->e;  // timestamp
 
-            state.planets.push_back(planetState);
+            a.d.push_back(d);
         }
     }
-    catch (const std::exception& e) {
-        std::cerr << "Exception in getGameState: " << e.what() << std::endl;
+    catch (const std::exception& b) {
+        std::cerr << "Exception in getGameState: " << b.what() << std::endl;
         // Return a minimal valid state to avoid crashes
     }
 
-    return state;
+    return a;
 }

@@ -25,29 +25,36 @@ enum class MessageType {
     PLAYER_INPUT = 2,
     PLAYER_ID = 3,
     HEARTBEAT = 4,
-    DISCONNECT = 5
+    DISCONNECT = 5,
+    CLIENT_SIMULATION = 6,   // New message type for client simulation state
+    SERVER_VALIDATION = 7    // New message type for server validation
 };
 
 class NetworkManager {
 private:
-    bool isHost;
-    std::vector<sf::TcpSocket*> clients;  // For host
-    sf::TcpSocket serverConnection;       // For client
-    sf::TcpListener listener;             // For host
-    unsigned short port;
-    bool connected;
+    bool a; // isHost
+    std::vector<sf::TcpSocket*> b; // clients
+    sf::TcpSocket c; // serverConnection
+    sf::TcpListener d; // listener
+    unsigned short e; // port
+    bool f; // connected
 
     // References to game components
-    GameServer* gameServer;
-    GameClient* gameClient;
+    GameServer* g; // gameServer
+    GameClient* h; // gameClient
 
     // Network diagnostics
-    sf::Clock lastPacketTime;
-    int packetLossCounter;
-    int pingMs;
+    sf::Clock i; // lastPacketTime
+    int j; // packetLossCounter
+    int k; // pingMs
 
     // Connection state tracking
-    ConnectionState connectionState;
+    ConnectionState l; // connectionState
+
+    // New variables for distributed simulation
+    float m; // syncInterval - how often to sync with server
+    sf::Clock n; // syncClock - tracks time since last sync
+    std::map<int, float> o; // clientLastSyncTimes - when each client last sent their simulation
 
 public:
     NetworkManager();
@@ -64,16 +71,26 @@ public:
     bool sendGameState(const GameState& state);   // Host only
     bool sendPlayerInput(const PlayerInput& input); // Client only
 
+    // New methods for distributed simulation
+    bool sendClientSimulation(const GameState& clientState);  // Client sending its simulation
+    bool sendServerValidation(const GameState& validatedState, int clientId);  // Server validation
+
     // Network robustness improvements
     void enableRobustNetworking();
     float getPing() const;
     int getPacketLoss() const;
 
-    bool isConnected() const { return connected; }
-    bool getIsHost() const { return isHost; }
-    bool isFullyConnected() const { return connected && connectionState == ConnectionState::CONNECTED; }
+    // Sync interval setter/getter
+    void setSyncInterval(float interval) { m = interval; }
+    float getSyncInterval() const { return m; }
+
+    bool isConnected() const { return f; }
+    bool getIsHost() const { return a; }
+    bool isFullyConnected() const { return f && l == ConnectionState::CONNECTED; }
 
     // Callbacks to be set by the game
     std::function<void(int clientId, const PlayerInput&)> onPlayerInputReceived;
     std::function<void(const GameState&)> onGameStateReceived;
+    std::function<void(int clientId, const GameState&)> onClientSimulationReceived;  // New callback
+    std::function<void(const GameState&)> onServerValidationReceived;  // New callback
 };

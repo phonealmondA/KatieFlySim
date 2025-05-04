@@ -3,79 +3,78 @@
 #include "GameConstants.h"
 #include <cmath>
 
-Planet::Planet(sf::Vector2f pos, float radius, float mass, sf::Color color)
-    : GameObject(pos, { 0, 0 }, color), mass(mass)
+Planet::Planet(sf::Vector2f pos, float radius, float mass, sf::Color color, int ownerId)
+    : GameObject(pos, { 0, 0 }, color), b(mass), d(ownerId)
 {
     // If a specific radius was provided, use it
     if (radius > 0) {
-        this->radius = radius;
+        this->c = radius;
     }
     else {
         // Otherwise calculate from mass
         updateRadiusFromMass();
     }
 
-    shape.setRadius(this->radius);
-    shape.setFillColor(color);
-    shape.setOrigin({ this->radius, this->radius });
-    shape.setPosition(position);
+    a.setRadius(this->c);
+    a.setFillColor(color);
+    a.setOrigin({ this->c, this->c });
+    a.setPosition(position);
 }
 
 void Planet::update(float deltaTime)
 {
     position += velocity * deltaTime;
-    shape.setPosition(position);
+    a.setPosition(position);
 }
 
 void Planet::draw(sf::RenderWindow& window)
 {
-    window.draw(shape);
+    window.draw(a);
 }
 
 float Planet::getMass() const
 {
-    return mass;
+    return b;
 }
 
 float Planet::getRadius() const
 {
-    return radius;
+    return c;
 }
 
 void Planet::setMass(float newMass)
 {
-    mass = newMass;
+    b = newMass;
     updateRadiusFromMass();
 }
 
 void Planet::updateRadiusFromMass()
 {
     // Use cube root relationship between mass and radius
-    radius = GameConstants::BASE_RADIUS_FACTOR *
-        std::pow(mass / GameConstants::REFERENCE_MASS, 1.0f / 3.0f);
+    c = GameConstants::BASE_RADIUS_FACTOR *
+        std::pow(b / GameConstants::REFERENCE_MASS, 1.0f / 3.0f);
 
     // Update the visual shape
-    shape.setRadius(radius);
-    shape.setOrigin({ radius, radius });
+    a.setRadius(c);
+    a.setOrigin({ c, c });
 }
 
 void Planet::drawVelocityVector(sf::RenderWindow& window, float scale)
 {
-    sf::VertexArray line(sf::PrimitiveType::LineStrip);
+    sf::VertexArray a(sf::PrimitiveType::LineStrip);
 
-    sf::Vertex startVertex;
-    startVertex.position = position;
-    startVertex.color = sf::Color::Yellow;
-    line.append(startVertex);
+    sf::Vertex b;
+    b.position = position;
+    b.color = sf::Color::Yellow;
+    a.append(b);
 
-    sf::Vertex endVertex;
-    endVertex.position = position + velocity * scale;
-    endVertex.color = sf::Color::Green;
-    line.append(endVertex);
+    sf::Vertex c;
+    c.position = position + velocity * scale;
+    c.color = sf::Color::Green;
+    a.append(c);
 
-    window.draw(line);
+    window.draw(a);
 }
-
 
 void Planet::setNearbyPlanets(const std::vector<Planet*>& planets) {
     // This method creates a reference to nearby planets for trajectory calculation
@@ -87,60 +86,60 @@ void Planet::drawOrbitPath(sf::RenderWindow& window, const std::vector<Planet*>&
     float timeStep, int steps)
 {
     // Create a vertex array for the trajectory line
-    sf::VertexArray trajectory(sf::PrimitiveType::LineStrip);
+    sf::VertexArray a(sf::PrimitiveType::LineStrip);
 
     // Start with current position and velocity
-    sf::Vector2f simPosition = position;
-    sf::Vector2f simVelocity = velocity;
+    sf::Vector2f b = position;
+    sf::Vector2f c = velocity;
 
     // Add the starting point
-    sf::Vertex startPoint;
-    startPoint.position = simPosition;
-    startPoint.color = sf::Color(color.r, color.g, color.b, 100); // Semi-transparent version of planet color
-    trajectory.append(startPoint);
+    sf::Vertex d;
+    d.position = b;
+    d.color = sf::Color(color.r, color.g, color.b, 100); // Semi-transparent version of planet color
+    a.append(d);
 
     // Simulate future positions
-    for (int i = 0; i < steps; i++) {
+    for (int e = 0; e < steps; e++) {
         // Calculate gravitational forces from all planets
-        sf::Vector2f totalAcceleration(0, 0);
+        sf::Vector2f f(0, 0);
 
-        for (const auto& otherPlanet : planets) {
+        for (const auto& g : planets) {
             // Skip self
-            if (otherPlanet == this) continue;
+            if (g == this) continue;
 
-            sf::Vector2f direction = otherPlanet->getPosition() - simPosition;
-            float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+            sf::Vector2f h = g->getPosition() - b;
+            float i = std::sqrt(h.x * h.x + h.y * h.y);
 
             // Skip if too close
-            if (distance <= otherPlanet->getRadius() + radius + GameConstants::TRAJECTORY_COLLISION_RADIUS) {
+            if (i <= g->getRadius() + c + GameConstants::TRAJECTORY_COLLISION_RADIUS) {
                 // Stop the trajectory if we hit another planet
                 break;
             }
 
             // Use same gravitational constant as in GravitySimulator
-            const float G = GameConstants::G;  // Use the constant from the header
-            float forceMagnitude = G * otherPlanet->getMass() * mass / (distance * distance);
+            const float j = GameConstants::G;  // Use the constant from the header
+            float k = j * g->getMass() * b / (i * i);
 
-            sf::Vector2f acceleration = normalize(direction) * forceMagnitude / mass;
-            totalAcceleration += acceleration;
+            sf::Vector2f l = normalize(h) * k / b;
+            f += l;
         }
 
         // Update simulated velocity and position
-        simVelocity += totalAcceleration * timeStep;
-        simPosition += simVelocity * timeStep;
+        c += f * timeStep;
+        b += c * timeStep;
 
         // Calculate fade-out effect
-        float alpha = 255 * (1.0f - static_cast<float>(i) / steps);
+        float g = 255 * (1.0f - static_cast<float>(e) / steps);
         // Use uint8_t instead of sf::Uint8
-        sf::Color pointColor(color.r, color.g, color.b, static_cast<uint8_t>(alpha));
+        sf::Color h(color.r, color.g, color.b, static_cast<uint8_t>(g));
 
         // Add point to trajectory
-        sf::Vertex point;
-        point.position = simPosition;
-        point.color = pointColor;
-        trajectory.append(point);
+        sf::Vertex i;
+        i.position = b;
+        i.color = h;
+        a.append(i);
     }
 
     // Draw the trajectory
-    window.draw(trajectory);
+    window.draw(a);
 }

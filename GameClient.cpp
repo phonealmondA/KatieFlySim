@@ -5,458 +5,644 @@
 #include <iostream>
 
 GameClient::GameClient()
-    : localPlayer(nullptr),
-    localPlayerId(0),
-    stateTimestamp(0.0f),
-    latencyCompensation(0.05f),
-    connectionState(ClientConnectionState::DISCONNECTED),
-    hasReceivedInitialState(false) {
+    : a(), // simulator
+    b(), // planets
+    c(), // remotePlayers
+    d(nullptr), // localPlayer
+    e(0), // localPlayerId
+    f(), // lastState
+    g(0.0f), // stateTimestamp
+    h(), // remotePlayerStates
+    i(0.05f), // latencyCompensation
+    j(ClientConnectionState::DISCONNECTED), // connectionState
+    k(false), // hasReceivedInitialState
+    l(), // localSimulation
+    m(), // simulationClock
+    n(0.0f), // simulationTime
+    o(false), // simulationPaused
+    p(0.0f), // lastServerSyncTime
+    q(0.1f), // syncInterval
+    r(false) // pendingValidation
+{
 }
 
 GameClient::~GameClient() {
     // Clean up players
-    for (auto& pair : remotePlayers) {
-        delete pair.second;
+    for (auto& a : c) {
+        delete a.second;
     }
-    remotePlayers.clear();
+    c.clear();
 
-    delete localPlayer;
-    localPlayer = nullptr;
+    delete d;
+    d = nullptr;
 
     // Clean up planets
-    for (auto& planet : planets) {
-        delete planet;
+    for (auto& a : b) {
+        delete a;
     }
-    planets.clear();
+    b.clear();
 }
 
 void GameClient::initialize() {
     try {
         // Flag that we're still waiting for initial state
-        hasReceivedInitialState = false;
-        connectionState = ClientConnectionState::CONNECTING;
+        k = false;
+        j = ClientConnectionState::CONNECTING;
 
         // Create main planet (placeholder until we get state from server)
-        Planet* mainPlanet = new Planet(
+        Planet* a = new Planet(
             sf::Vector2f(GameConstants::MAIN_PLANET_X, GameConstants::MAIN_PLANET_Y),
             0, GameConstants::MAIN_PLANET_MASS, sf::Color::Blue);
-        mainPlanet->setVelocity(sf::Vector2f(1.f, -1.f));
-        planets.push_back(mainPlanet);
+        a->setVelocity(sf::Vector2f(1.f, -1.f));
+        b.push_back(a);
 
         // Create secondary planet
-        Planet* secondaryPlanet = new Planet(
+        Planet* b = new Planet(
             sf::Vector2f(GameConstants::SECONDARY_PLANET_X, GameConstants::SECONDARY_PLANET_Y),
             0, GameConstants::SECONDARY_PLANET_MASS, sf::Color::Green);
-        secondaryPlanet->setVelocity(sf::Vector2f(0.f, GameConstants::SECONDARY_PLANET_ORBITAL_VELOCITY));
-        planets.push_back(secondaryPlanet);
+        b->setVelocity(sf::Vector2f(0.f, GameConstants::SECONDARY_PLANET_ORBITAL_VELOCITY));
+        this->b.push_back(b);
 
         // Setup local player (placeholder until we get assigned ID)
-        sf::Vector2f initialPos = planets[0]->getPosition() +
-            sf::Vector2f(0, -(planets[0]->getRadius() + GameConstants::ROCKET_SIZE));
+        sf::Vector2f c = this->b[0]->getPosition() +
+            sf::Vector2f(0, -(this->b[0]->getRadius() + GameConstants::ROCKET_SIZE));
 
         // Always check null pointers
-        if (localPlayer) {
-            delete localPlayer;
-            localPlayer = nullptr;
+        if (d) {
+            delete d;
+            d = nullptr;
         }
 
         // Create the local player with error checking
         try {
-            localPlayer = new VehicleManager(initialPos, planets);
-            if (!localPlayer || !localPlayer->getRocket()) {
+            d = new VehicleManager(c, this->b, e);
+            if (!d || !d->getRocket()) {
                 std::cerr << "Failed to create valid VehicleManager for local player" << std::endl;
-                delete localPlayer;
-                localPlayer = nullptr;
+                delete d;
+                d = nullptr;
                 throw std::runtime_error("Local player creation failed");
             }
         }
-        catch (const std::exception& e) {
-            std::cerr << "Exception creating local player: " << e.what() << std::endl;
-            if (localPlayer) {
-                delete localPlayer;
-                localPlayer = nullptr;
+        catch (const std::exception& a) {
+            std::cerr << "Exception creating local player: " << a.what() << std::endl;
+            if (d) {
+                delete d;
+                d = nullptr;
             }
             throw; // Re-throw to inform caller
         }
 
         // Setup gravity simulator
-        simulator.setSimulatePlanetGravity(true);
-        for (auto planet : planets) {
-            if (planet) {
-                simulator.addPlanet(planet);
+        this->a.setSimulatePlanetGravity(true);
+        this->a.setOwnerId(e); // Set owner to local player ID
+
+        for (auto a : this->b) {
+            if (a) {
+                this->a.addPlanet(a);
             }
         }
 
-        if (localPlayer) {
-            simulator.addVehicleManager(localPlayer);
+        if (d) {
+            this->a.addVehicleManager(d);
         }
+
+        // Initialize the local simulation
+        initializeLocalSimulation();
 
         std::cout << "GameClient initialized successfully" << std::endl;
     }
-    catch (const std::exception& e) {
-        std::cerr << "Exception in GameClient::initialize: " << e.what() << std::endl;
+    catch (const std::exception& a) {
+        std::cerr << "Exception in GameClient::initialize: " << a.what() << std::endl;
         // Clean up any resources that might have been partially initialized
-        for (auto& planet : planets) {
-            delete planet;
+        for (auto& a : b) {
+            delete a;
         }
-        planets.clear();
+        b.clear();
 
-        delete localPlayer;
-        localPlayer = nullptr;
+        delete d;
+        d = nullptr;
 
         // Re-throw to inform caller
         throw;
     }
 }
 
+void GameClient::initializeLocalSimulation() {
+    // Start with an empty local simulation
+    l = GameState();
+    l.a = 0; // Sequence number
+    l.b = 0.0f; // Timestamp
+
+    // Add local rocket if available
+    if (d && d->getRocket()) {
+        RocketState a;
+        d->createState(a);
+        l.c.push_back(a);
+    }
+
+    // Add planets
+    for (size_t a = 0; a < b.size(); ++a) {
+        Planet* b = this->b[a];
+        if (!b) continue;
+
+        PlanetState c;
+        c.a = static_cast<int>(a); // planetId
+        c.b = b->getPosition(); // position
+        c.c = b->getVelocity(); // velocity
+        c.d = b->getMass(); // mass
+        c.e = b->getRadius(); // radius
+        c.f = b->getColor(); // color
+        c.g = b->getOwnerId(); // ownerId
+        c.h = 0.0f; // timestamp
+
+        l.d.push_back(c);
+    }
+
+    // Start the simulation clock
+    m.restart();
+    n = 0.0f;
+    o = false;
+}
+
 void GameClient::update(float deltaTime) {
     try {
         // Skip updates if not fully connected
-        if (connectionState != ClientConnectionState::CONNECTED && !hasReceivedInitialState) {
+        if (j != ClientConnectionState::CONNECTED && !k) {
             return;
         }
 
+        // Update the simulation time
+        if (!o) {
+            n += deltaTime;
+        }
+
+        // Run local simulation if not paused
+        if (!o) {
+            runLocalSimulation(deltaTime);
+        }
+
         // Update simulator with null checking
-        simulator.update(deltaTime);
+        this->a.update(deltaTime);
 
         // Update planets with null checking
-        for (auto planet : planets) {
-            if (planet) {
-                planet->update(deltaTime);
+        for (auto a : b) {
+            if (a) {
+                a->update(deltaTime);
             }
         }
 
         // Update local player with null checking
-        if (localPlayer) {
-            localPlayer->update(deltaTime);
+        if (d) {
+            d->update(deltaTime);
         }
 
         // Update remote players with null checking
-        for (auto& pair : remotePlayers) {
-            if (pair.second) {
-                pair.second->update(deltaTime);
+        for (auto& a : c) {
+            if (a.second) {
+                a.second->update(deltaTime);
+            }
+        }
+
+        // Check if it's time to sync with server
+        if (m.getElapsedTime().asSeconds() >= q && !o && !r) {
+            // Update local simulation with current state
+            if (d && d->getRocket()) {
+                RocketState a;
+                d->createState(a);
+
+                // Update or add our rocket in the local simulation
+                bool b = false;
+                for (auto& c : l.c) {
+                    if (c.a == e) {
+                        c = a;
+                        b = true;
+                        break;
+                    }
+                }
+
+                if (!b) {
+                    l.c.push_back(a);
+                }
+
+                // Update the timestamp
+                l.b = n;
+
+                // Set flag for sending to server
+                r = true;
             }
         }
     }
-    catch (const std::exception& e) {
-        std::cerr << "Exception in GameClient::update: " << e.what() << std::endl;
+    catch (const std::exception& a) {
+        std::cerr << "Exception in GameClient::update: " << a.what() << std::endl;
         // Continue execution - don't re-throw from update
     }
+}
+
+void GameClient::runLocalSimulation(float deltaTime) {
+    // Skip if not ready
+    if (j != ClientConnectionState::CONNECTED || !k) {
+        return;
+    }
+
+    // Make local changes to the simulation
+    if (d && d->getRocket()) {
+        // Update the rocket state in local simulation
+        RocketState a;
+        d->createState(a);
+
+        // Update or add this rocket in the simulation
+        bool b = false;
+        for (auto& c : l.c) {
+            if (c.a == e) {
+                c = a;
+                b = true;
+                break;
+            }
+        }
+
+        if (!b) {
+            l.c.push_back(a);
+        }
+    }
+
+    // Update planets in local simulation
+    for (size_t a = 0; a < b.size() && a < l.d.size(); ++a) {
+        Planet* b = this->b[a];
+        if (!b) continue;
+
+        l.d[a].b = b->getPosition();
+        l.d[a].c = b->getVelocity();
+        l.d[a].d = b->getMass();
+    }
+
+    // Update timestamp
+    l.b = n;
+}
+
+void GameClient::processServerValidation(const GameState& validatedState) {
+    // Reset the validation pending flag
+    r = false;
+
+    // Update last server sync time
+    p = n;
+
+    // Check if server rejected our simulation
+    if (validatedState.e) { // isInitialState flag is used to indicate server override
+        // Server is overriding our state - pause simulation
+        o = true;
+
+        // Apply the server's state
+        processGameState(validatedState);
+
+        // Resume simulation
+        o = false;
+
+        // Reset simulation time to server time
+        n = validatedState.b;
+
+        // Reset the local simulation to match server state
+        l = validatedState;
+    }
+
+    // Otherwise, server accepted our simulation - continue normally
 }
 
 void GameClient::processGameState(const GameState& state) {
     try {
         // Don't process empty states
-        if (state.planets.empty()) {
+        if (state.d.empty()) {
             std::cerr << "Received empty game state, ignoring" << std::endl;
             return;
         }
 
         // Update last state
-        lastState = state;
-        stateTimestamp = state.timestamp;
+        f = state;
+        g = state.b;
 
         // Update connection state if this is our first state
-        if (!hasReceivedInitialState) {
-            std::cout << "Received initial game state with " << state.planets.size() << " planets and "
-                << state.rockets.size() << " rockets" << std::endl;
+        if (!k) {
+            std::cout << "Received initial game state with " << state.d.size() << " planets and "
+                << state.c.size() << " rockets" << std::endl;
 
-            connectionState = ClientConnectionState::CONNECTED;
-            hasReceivedInitialState = true;
+            j = ClientConnectionState::CONNECTED;
+            k = true;
             std::cout << "Client now fully connected and ready for gameplay" << std::endl;
+
+            // Initialize local simulation with this state
+            l = state;
+            n = state.b;
+            m.restart();
         }
 
         // Process planets - ensure we have the right number of planets
-        for (const auto& planetState : state.planets) {
-            if (planetState.planetId < 0) {
-                std::cerr << "Invalid planet ID: " << planetState.planetId << std::endl;
+        for (const auto& a : state.d) {
+            if (a.a < 0) {
+                std::cerr << "Invalid planet ID: " << a.a << std::endl;
                 continue;
             }
 
             // Make sure we have enough planets
-            while (planetState.planetId >= static_cast<int>(planets.size())) {
+            while (a.a >= static_cast<int>(b.size())) {
                 try {
-                    Planet* newPlanet = new Planet(sf::Vector2f(0, 0), 0, 1.0f);
-                    planets.push_back(newPlanet);
-                    simulator.addPlanet(newPlanet);
+                    Planet* b = new Planet(sf::Vector2f(0, 0), 0, 1.0f);
+                    this->b.push_back(b);
+                    this->a.addPlanet(b);
                 }
-                catch (const std::exception& e) {
-                    std::cerr << "Exception creating new planet: " << e.what() << std::endl;
+                catch (const std::exception& b) {
+                    std::cerr << "Exception creating new planet: " << b.what() << std::endl;
                     break;
                 }
             }
 
             // Update planet state
-            if (planetState.planetId < static_cast<int>(planets.size())) {
-                Planet* planet = planets[planetState.planetId];
-                if (planet) {
-                    planet->setPosition(planetState.position);
-                    planet->setVelocity(planetState.velocity);
-                    planet->setMass(planetState.mass);
+            if (a.a < static_cast<int>(b.size())) {
+                Planet* b = this->b[a.a];
+                if (b) {
+                    b->setPosition(a.b);
+                    b->setVelocity(a.c);
+                    b->setMass(a.d);
+                    b->setOwnerId(a.g); // Set owner ID
                 }
             }
         }
 
         // Process rockets
-        for (const auto& rocketState : state.rockets) {
+        for (const auto& a : state.c) {
             // First ensure we have a valid local player initialized
-            if (!localPlayer && !planets.empty()) {
+            if (!d && !b.empty()) {
                 try {
-                    sf::Vector2f pos = planets[0]->getPosition() +
-                        sf::Vector2f(0, -(planets[0]->getRadius() + GameConstants::ROCKET_SIZE));
-                    localPlayer = new VehicleManager(pos, planets);
-                    simulator.addVehicleManager(localPlayer);
+                    sf::Vector2f b = this->b[0]->getPosition() +
+                        sf::Vector2f(0, -(this->b[0]->getRadius() + GameConstants::ROCKET_SIZE));
+                    d = new VehicleManager(b, this->b, e);
+                    this->a.addVehicleManager(d);
                     std::cout << "Created local player (was null)" << std::endl;
                 }
-                catch (const std::exception& e) {
-                    std::cerr << "Exception creating local player: " << e.what() << std::endl;
+                catch (const std::exception& b) {
+                    std::cerr << "Exception creating local player: " << b.what() << std::endl;
                     continue;
                 }
             }
-            // In the processGameState method in GameClient.cpp, after creating the local player:
-            if (rocketState.playerId == localPlayerId) {
-                // This is our local player
-                if (!localPlayer) {
-                    // Create local player if it doesn't exist
-                    try {
-                        localPlayer = new VehicleManager(rocketState.position, planets);
-                        simulator.addVehicleManager(localPlayer);
-                        std::cout << "Created local player with ID: " << localPlayerId << std::endl;
 
-                        // Verify the rocket was actually created
-                        if (!localPlayer->getRocket()) {
-                            std::cerr << "ERROR: Local player created but rocket is null!" << std::endl;
-                            delete localPlayer;
-                            localPlayer = nullptr;
+            // Process rocket based on player ID
+            if (a.a == e) {
+                // This is our local player - only update if server state is authoritative
+                if (a.j) {
+                    if (!d) {
+                        // Create local player if it doesn't exist
+                        try {
+                            d = new VehicleManager(a.b, b, e);
+                            this->a.addVehicleManager(d);
+                            std::cout << "Created local player with ID: " << e << std::endl;
+
+                            // Verify the rocket was actually created
+                            if (!d->getRocket()) {
+                                std::cerr << "ERROR: Local player created but rocket is null!" << std::endl;
+                                delete d;
+                                d = nullptr;
+                                continue;
+                            }
+                            else {
+                                std::cout << "Successfully created rocket for local player" << std::endl;
+                            }
+                        }
+                        catch (const std::exception& b) {
+                            std::cerr << "Exception creating local player: " << b.what() << std::endl;
                             continue;
                         }
-                        else {
-                            std::cout << "Successfully created rocket for local player" << std::endl;
-                        }
                     }
-                    catch (const std::exception& e) {
-                        std::cerr << "Exception creating local player: " << e.what() << std::endl;
-                        continue;
-                    }
-                }
 
-                // And add more explicit verification after updating the rocket
-                if (localPlayer && localPlayer->getRocket()) {
-                    std::cout << "Updated local rocket position: " << rocketState.position.x << ", "
-                        << rocketState.position.y << std::endl;
-                }
-                else {
-                    std::cerr << "ERROR: Local player exists but rocket is null after state update" << std::endl;
+                    // Apply the server state to our local rocket
+                    if (d && d->getRocket()) {
+                        d->applyState(a);
+                        std::cout << "Updated local rocket position: " << a.b.x << ", " << a.b.y << std::endl;
+                    }
+                    else {
+                        std::cerr << "ERROR: Local player exists but rocket is null after state update" << std::endl;
+                    }
                 }
             }
             else {
                 // This is a remote player
-                VehicleManager* manager = nullptr;
-                auto it = remotePlayers.find(rocketState.playerId);
+                VehicleManager* b = nullptr;
+                auto c = this->c.find(a.a);
 
-                if (it == remotePlayers.end()) {
+                if (c == this->c.end()) {
                     // Create a new remote player
                     try {
-                        manager = new VehicleManager(rocketState.position, planets);
-                        if (manager && manager->getRocket()) {
-                            remotePlayers[rocketState.playerId] = manager;
-                            simulator.addVehicleManager(manager);
+                        b = new VehicleManager(a.b, this->b, a.a);
+                        if (b && b->getRocket()) {
+                            this->c[a.a] = b;
+                            this->a.addVehicleManager(b);
 
                             // Set color based on player ID
-                            manager->getRocket()->setColor(sf::Color(
-                                100 + (rocketState.playerId * 50) % 155,
-                                100 + (rocketState.playerId * 30) % 155,
-                                100 + (rocketState.playerId * 70) % 155
-                            ));
+                            b->getRocket()->setColor(a.h);
 
-                            std::cout << "Added remote player with ID: " << rocketState.playerId << std::endl;
+                            std::cout << "Added remote player with ID: " << a.a << std::endl;
                         }
                         else {
                             std::cerr << "Failed to create valid VehicleManager for remote player" << std::endl;
-                            delete manager; // Clean up if rocket initialization failed
+                            delete b; // Clean up if rocket initialization failed
                         }
                     }
-                    catch (const std::exception& e) {
-                        std::cerr << "Exception creating remote player: " << e.what() << std::endl;
-                        delete manager; // Clean up on exception
+                    catch (const std::exception& c) {
+                        std::cerr << "Exception creating remote player: " << c.what() << std::endl;
+                        delete b; // Clean up on exception
                         continue;
                     }
                 }
                 else {
-                    manager = it->second;
+                    b = c->second;
                 }
-
                 // Update rocket state with interpolation if manager exists
-                if (manager && manager->getRocket()) {
-                    Rocket* rocket = manager->getRocket();
+                if (b && b->getRocket()) {
+                    Rocket* d = b->getRocket();
 
                     // Store previous position for interpolation
-                    sf::Vector2f prevPos = rocket->getPosition();
-                    sf::Vector2f prevVel = rocket->getVelocity();
+                    sf::Vector2f e = d->getPosition();
+                    sf::Vector2f f = d->getVelocity();
 
                     // Update with server values
-                    rocket->setPosition(rocketState.position);
-                    rocket->setVelocity(rocketState.velocity);
-                    rocket->setRotation(rocketState.rotation);
-                    rocket->setThrustLevel(rocketState.thrustLevel);
+                    d->setPosition(a.b);
+                    d->setVelocity(a.c);
+                    d->setRotation(a.d);
+                    d->setThrustLevel(a.f);
 
                     // Store for interpolation
-                    remotePlayerStates[rocketState.playerId] = {
-                        prevPos, prevVel,
-                        rocketState.position, rocketState.velocity,
-                        rocketState.rotation,
-                        state.timestamp
+                    h[a.a] = {
+                        e, f,
+                        a.b, a.c,
+                        a.d,
+                        state.b
                     };
                 }
             }
         }
 
         // Remove any players that weren't in the update
-        std::vector<int> playersToRemove;
-        for (const auto& pair : remotePlayers) {
-            bool found = false;
-            for (const auto& rocketState : state.rockets) {
-                if (rocketState.playerId == pair.first) {
-                    found = true;
+        std::vector<int> a;
+        for (const auto& b : c) {
+            bool c = false;
+            for (const auto& d : state.c) {
+                if (d.a == b.first) {
+                    c = true;
                     break;
                 }
             }
 
-            if (!found) {
-                playersToRemove.push_back(pair.first);
+            if (!c) {
+                a.push_back(b.first);
             }
         }
 
-        for (int playerId : playersToRemove) {
-            std::cout << "Remote player " << playerId << " disconnected" << std::endl;
-            if (remotePlayers[playerId]) {
-                simulator.removeVehicleManager(remotePlayers[playerId]);
-                delete remotePlayers[playerId];
+        for (int a : a) {
+            std::cout << "Remote player " << a << " disconnected" << std::endl;
+            if (c[a]) {
+                this->a.removeVehicleManager(c[a]);
+                delete c[a];
             }
-            remotePlayers.erase(playerId);
-            remotePlayerStates.erase(playerId);
+            c.erase(a);
+            h.erase(a);
         }
     }
-    catch (const std::exception& e) {
-        std::cerr << "Exception in processGameState: " << e.what() << std::endl;
+    catch (const std::exception& a) {
+        std::cerr << "Exception in processGameState: " << a.what() << std::endl;
     }
 }
 
-
-
 void GameClient::setLatencyCompensation(float value) {
-    latencyCompensation = value;
+    i = value;
 }
 
 void GameClient::setLocalPlayerId(int id) {
-    localPlayerId = id;
-    connectionState = ClientConnectionState::WAITING_FOR_STATE;
+    e = id;
+    j = ClientConnectionState::WAITING_FOR_STATE;
     std::cout << "Local player ID set to: " << id << ", waiting for initial game state..." << std::endl;
+
+    // Also set the owner ID for local objects
+    if (d) {
+        d->setOwnerId(id);
+        if (d->getRocket()) {
+            d->getRocket()->setOwnerId(id);
+        }
+    }
+
+    // Set simulator owner ID
+    a.setOwnerId(id);
 }
 
 PlayerInput GameClient::getLocalPlayerInput(float deltaTime) const {
-    PlayerInput input;
-    input.playerId = localPlayerId;
-    input.deltaTime = deltaTime;
+    PlayerInput a;
+    a.a = e; // playerId
+    a.h = deltaTime; // deltaTime
+    a.i = n; // clientTimestamp
+    a.j = g; // lastServerStateTimestamp
 
     // Skip input collection if not fully connected
-    if (connectionState != ClientConnectionState::CONNECTED || !hasReceivedInitialState || !localPlayer) {
-        return input;
+    if (j != ClientConnectionState::CONNECTED || !k || !d) {
+        return a;
     }
 
     // Get keyboard state
-    input.thrustForward = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W);
-    input.thrustBackward = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S);
-    input.rotateLeft = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A);
-    input.rotateRight = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D);
+    a.b = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W); // thrustForward
+    a.c = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S); // thrustBackward
+    a.d = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A); // rotateLeft
+    a.e = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D); // rotateRight
+    a.f = false; // switchVehicle - not implemented in this version
 
     // Get thrust level
-    if (localPlayer && localPlayer->getActiveVehicleType() == VehicleType::ROCKET && localPlayer->getRocket()) {
-        input.thrustLevel = localPlayer->getRocket()->getThrustLevel();
+    if (d && d->getActiveVehicleType() == VehicleType::ROCKET && d->getRocket()) {
+        a.g = d->getRocket()->getThrustLevel(); // thrustLevel
+
+        // Include current rocket state
+        if (r) { // If pending validation
+            RocketState b;
+            d->createState(b);
+            a.k = b; // clientRocketState
+        }
     }
 
-    return input;
+    return a;
 }
 
 void GameClient::applyLocalInput(const PlayerInput& input) {
     // Skip if not fully connected or no local player
-    if (!hasReceivedInitialState || connectionState != ClientConnectionState::CONNECTED || !localPlayer) {
+    if (!k || j != ClientConnectionState::CONNECTED || !d) {
         return;
     }
 
     try {
         // Apply input to local player immediately for responsive feel
-        if (input.thrustForward) {
-            localPlayer->applyThrust(1.0f);
+        if (input.b) {
+            d->applyThrust(1.0f);
         }
-        if (input.thrustBackward) {
-            localPlayer->applyThrust(-0.5f);
+        if (input.c) {
+            d->applyThrust(-0.5f);
         }
-        if (input.rotateLeft) {
-            localPlayer->rotate(-6.0f * input.deltaTime * 60.0f);
+        if (input.d) {
+            d->rotate(-6.0f * input.h * 60.0f);
         }
-        if (input.rotateRight) {
-            localPlayer->rotate(6.0f * input.deltaTime * 60.0f);
+        if (input.e) {
+            d->rotate(6.0f * input.h * 60.0f);
         }
-        if (input.switchVehicle) {
-            localPlayer->switchVehicle();
+        if (input.f) {
+            d->switchVehicle();
         }
 
         // Apply thrust level
-        if (localPlayer->getActiveVehicleType() == VehicleType::ROCKET && localPlayer->getRocket()) {
-            localPlayer->getRocket()->setThrustLevel(input.thrustLevel);
+        if (d->getActiveVehicleType() == VehicleType::ROCKET && d->getRocket()) {
+            d->getRocket()->setThrustLevel(input.g);
         }
     }
-    catch (const std::exception& e) {
-        std::cerr << "Exception in applyLocalInput: " << e.what() << std::endl;
+    catch (const std::exception& a) {
+        std::cerr << "Exception in applyLocalInput: " << a.what() << std::endl;
     }
 }
 
 void GameClient::interpolateRemotePlayers(float currentTime) {
     // Skip if not fully connected
-    if (!hasReceivedInitialState || connectionState != ClientConnectionState::CONNECTED) {
+    if (!k || j != ClientConnectionState::CONNECTED) {
         return;
     }
 
     try {
-        for (auto it = remotePlayerStates.begin(); it != remotePlayerStates.end(); ) {
-            int playerId = it->first;
-            RemotePlayerState& stateData = it->second;
+        for (auto a = h.begin(); a != h.end(); ) {
+            int b = a->first;
+            RemotePlayerState& c = a->second;
 
-            auto playerIt = remotePlayers.find(playerId);
-            if (playerIt == remotePlayers.end() || !playerIt->second || !playerIt->second->getRocket()) {
+            auto d = this->c.find(b);
+            if (d == this->c.end() || !d->second || !d->second->getRocket()) {
                 // Remove stale state if player no longer exists
-                it = remotePlayerStates.erase(it);
+                a = h.erase(a);
                 continue;
             }
 
-            VehicleManager* manager = playerIt->second;
-            Rocket* rocket = manager->getRocket();
-            if (!rocket) {
-                ++it;
+            VehicleManager* e = d->second;
+            Rocket* f = e->getRocket();
+            if (!f) {
+                ++a;
                 continue;
             }
 
             // Calculate interpolation factor
-            float timeElapsed = currentTime - stateData.timestamp;
-            float alpha = std::min(timeElapsed / latencyCompensation, 1.0f);
+            float g = currentTime - c.f;
+            float h = std::min(g / i, 1.0f);
 
             // Interpolate position and velocity
-            sf::Vector2f interpolatedPos = stateData.startPos + (stateData.targetPos - stateData.startPos) * alpha;
-            sf::Vector2f interpolatedVel = stateData.startVel + (stateData.targetVel - stateData.startVel) * alpha;
+            sf::Vector2f i = c.a + (c.c - c.a) * h;
+            sf::Vector2f j = c.b + (c.d - c.b) * h;
 
             try {
-                rocket->setPosition(interpolatedPos);
-                rocket->setVelocity(interpolatedVel);
+                f->setPosition(i);
+                f->setVelocity(j);
             }
-            catch (const std::exception& e) {
-                std::cerr << "Exception in interpolateRemotePlayers: " << e.what() << std::endl;
+            catch (const std::exception& a) {
+                std::cerr << "Exception in interpolateRemotePlayers: " << a.what() << std::endl;
             }
 
-            ++it;
+            ++a;
         }
     }
-    catch (const std::exception& e) {
-        std::cerr << "Exception in interpolateRemotePlayers: " << e.what() << std::endl;
+    catch (const std::exception& a) {
+        std::cerr << "Exception in interpolateRemotePlayers: " << a.what() << std::endl;
     }
 }
