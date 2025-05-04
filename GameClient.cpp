@@ -3,6 +3,7 @@
 #include "GameConstants.h"
 #include "VectorHelper.h"
 #include <iostream>
+#include <ctime>
 
 GameClient::GameClient()
     : a(), // simulator
@@ -547,7 +548,7 @@ PlayerInput GameClient::getLocalPlayerInput(float deltaTime) const {
     a.c = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S); // thrustBackward
     a.d = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A); // rotateLeft
     a.e = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D); // rotateRight
-    a.f = false; // switchVehicle - not implemented in this version
+    a.f = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::L); // switchVehicle
 
     // Get thrust level
     if (d && d->getActiveVehicleType() == VehicleType::ROCKET && d->getRocket()) {

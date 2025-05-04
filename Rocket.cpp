@@ -6,6 +6,7 @@
 #include <iostream>
 #include <cstdint>  // For uint8_t
 #include <cstdlib>  // For rand()
+#include <ctime>    // For std::time
 
 Rocket::Rocket(sf::Vector2f pos, sf::Vector2f vel, sf::Color col, float mass, int ownerId)
     : GameObject(pos, vel, col), c(0), d(0),
@@ -308,14 +309,14 @@ void Rocket::update(float deltaTime)
 
         // Check if we're resting on any planet
         if (!f.empty()) {
-            for (const auto& a : f) {
-                if (!a) continue; // Skip null planets
+            for (const auto& p : f) {
+                if (!p) continue; // Skip null planets
 
-                sf::Vector2f b = position - a->getPosition();
-                float c = std::sqrt(b.x * b.x + b.y * b.y);
+                sf::Vector2f b = position - p->getPosition();
+                float dist = std::sqrt(b.x * b.x + b.y * b.y);
 
                 // If we're at or below the surface of the planet
-                if (c <= (a->getRadius() + GameConstants::ROCKET_SIZE)) {
+                if (dist <= (p->getRadius() + GameConstants::ROCKET_SIZE)) {
                     // Calculate normal force direction (away from planet center)
                     sf::Vector2f d = normalize(b);
 
@@ -332,9 +333,9 @@ void Rocket::update(float deltaTime)
                         velocity = f * g * 0.98f;
 
                         // Position correction to stay exactly on surface
-                        position = a->getPosition() + d * (a->getRadius() + GameConstants::ROCKET_SIZE);
+                        position = p->getPosition() + d * (p->getRadius() + GameConstants::ROCKET_SIZE);
 
-                        this->a = true;
+                        a = true;
                     }
                 }
             }

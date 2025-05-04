@@ -316,6 +316,7 @@ void VehicleManager::updatePlanets(const std::vector<Planet*>& newPlanets) {
         std::cerr << "Exception in updatePlanets: " << a.what() << std::endl;
     }
 }
+
 void VehicleManager::createState(RocketState& state) const {
     if (a && c == VehicleType::ROCKET) {
         // Set player ID based on owner

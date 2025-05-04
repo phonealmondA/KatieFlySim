@@ -5,6 +5,7 @@
 #include "RocketPart.h"
 #include "Engine.h"
 #include "Planet.h"
+#include "GameState.h"
 #include <vector>
 #include <memory>
 #include <iostream>
@@ -92,8 +93,7 @@ public:
     void setColor(sf::Color col) { color = col; }
     sf::Color getColor() const { return color; }
 
-    // Serialization helper - create RocketState from this rocket
+    // State serialization methods
     RocketState createState() const;
-    // Apply state to this rocket
     void applyState(const RocketState& state);
 };
