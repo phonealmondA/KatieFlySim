@@ -366,3 +366,201 @@ void Rocket::update(float deltaTime)
         std::cerr << "Exception in Rocket::update: " << a.what() << std::endl;
     }
 }
+
+// MISSING IMPLEMENTATIONS ADDED BELOW:
+
+void Rocket::draw(sf::RenderWindow& window) {
+    // Draw the rocket body
+    window.draw(a);
+
+    // Draw all rocket parts
+    for (const auto& part : b) {
+        if (part) {
+            part->draw(window, position, c, 1.0f, e, h > 0.0f);
+        }
+    }
+
+    // Draw stored mass visual if we have stored mass
+    if (h > 0.0f) {
+        window.draw(j);
+    }
+}
+
+void Rocket::drawWithConstantSize(sf::RenderWindow& window, float zoomLevel) {
+    // Create a scaled copy of the rocket shape
+    sf::ConvexShape scaledBody = a;
+
+    // Scale the points
+    for (size_t i = 0; i < scaledBody.getPointCount(); i++) {
+        sf::Vector2f point = a.getPoint(i);
+        scaledBody.setPoint(i, point * zoomLevel);
+    }
+
+    // Set position and rotation
+    scaledBody.setPosition(position);
+    scaledBody.setRotation(sf::degrees(c));
+
+    // Draw the scaled body
+    window.draw(scaledBody);
+
+    // Draw all parts with the zoom scale
+    for (const auto& part : b) {
+        if (part) {
+            part->draw(window, position, c, zoomLevel, e, h > 0.0f);
+        }
+    }
+
+    // Scale and draw stored mass visual if we have stored mass
+    if (h > 0.0f) {
+        sf::CircleShape scaledMass = j;
+        scaledMass.setRadius(j.getRadius() * zoomLevel);
+        scaledMass.setOrigin(j.getOrigin() * zoomLevel);
+        scaledMass.setPosition(j.getPosition());
+        window.draw(scaledMass);
+    }
+}
+
+void Rocket::drawVelocityVector(sf::RenderWindow& window, float scale) {
+    // Create a vertex array for the velocity vector line
+    sf::VertexArray velocityLine(sf::PrimitiveType::LineStrip);
+
+    // Start point at rocket position
+    sf::Vertex start;
+    start.position = position;
+    start.color = sf::Color::Yellow;
+    velocityLine.append(start);
+
+    // End point at position + scaled velocity
+    sf::Vertex end;
+    end.position = position + velocity * scale;
+    end.color = sf::Color::Green;
+    velocityLine.append(end);
+
+    // Draw the velocity vector
+    window.draw(velocityLine);
+}
+
+void Rocket::drawGravityForceVectors(sf::RenderWindow& window, const std::vector<Planet*>& planets, float scale) {
+    // For each planet, draw a line representing gravity force
+    for (const auto& planet : planets) {
+        if (!planet) continue; // Skip null planets
+
+        // Calculate direction to planet
+        sf::Vector2f direction = planet->getPosition() - position;
+        float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+
+        // Skip if too close or too far
+        if (distance <= planet->getRadius() || distance > 2000.0f) {
+            continue;
+        }
+
+        // Calculate force magnitude using gravity formula
+        float forceMagnitude = GameConstants::G * planet->getMass() * g / (distance * distance);
+
+        // Normalize the direction vector
+        sf::Vector2f normalizedDir = normalize(direction);
+
+        // Scale the force for visualization
+        sf::Vector2f forceVector = normalizedDir * forceMagnitude * scale;
+
+        // Create a vertex array for the force line
+        sf::VertexArray forceLine(sf::PrimitiveType::LineStrip);
+
+        // Start point at rocket position
+        sf::Vertex start;
+        start.position = position;
+        start.color = sf::Color::Blue;
+        forceLine.append(start);
+
+        // End point at position + scaled force
+        sf::Vertex end;
+        end.position = position + forceVector;
+        end.color = sf::Color::Red;
+        forceLine.append(end);
+
+        // Draw the force vector
+        window.draw(forceLine);
+    }
+}
+
+void Rocket::drawTrajectory(sf::RenderWindow& window, const std::vector<Planet*>& planets, float timeStep, int steps, bool detectSelfIntersection) {
+    // Create a vertex array for the trajectory
+    sf::VertexArray trajectoryLine(sf::PrimitiveType::LineStrip);
+
+    // Start with current position and velocity
+    sf::Vector2f simPos = position;
+    sf::Vector2f simVel = velocity;
+    float simMass = g;
+
+    // Add the starting point
+    sf::Vertex startPoint;
+    startPoint.position = simPos;
+    startPoint.color = sf::Color(color.r, color.g, color.b, 100); // Semi-transparent
+    trajectoryLine.append(startPoint);
+
+    // Track if we've hit something to stop the trajectory
+    bool hitObject = false;
+
+    // Simulate future positions
+    for (int step = 0; step < steps && !hitObject; step++) {
+        // Calculate gravitational forces from all planets
+        sf::Vector2f totalForce(0, 0);
+
+        for (const auto& planet : planets) {
+            if (!planet) continue; // Skip null planets
+
+            // Skip if the planet is ourselves (when projecting a planet's orbit)
+            //if (planet == this) continue;
+
+            sf::Vector2f direction = planet->getPosition() - simPos;
+            float dist = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+
+            // Check for collision with planet
+            if (dist <= planet->getRadius() + GameConstants::TRAJECTORY_COLLISION_RADIUS) {
+                hitObject = true;
+                break;
+            }
+
+            // Calculate gravitational force
+            float forceMag = GameConstants::G * planet->getMass() * simMass / (dist * dist);
+            sf::Vector2f forceDir = normalize(direction);
+            totalForce += forceDir * forceMag;
+        }
+
+        if (hitObject) break;
+
+        // Update simulated velocity and position
+        simVel += totalForce / simMass * timeStep;
+        simPos += simVel * timeStep;
+
+        // Calculate fade-out effect
+        float alpha = 255 * (1.0f - static_cast<float>(step) / steps);
+
+        // Add point to trajectory
+        sf::Vertex point;
+        point.position = simPos;
+        point.color = sf::Color(color.r, color.g, color.b, static_cast<uint8_t>(alpha));
+        trajectoryLine.append(point);
+
+        // Check for self-intersection if requested
+        if (detectSelfIntersection && step > 10) {
+            // Simple implementation: just check against starting point
+            float distToStart = std::sqrt(
+                (simPos.x - position.x) * (simPos.x - position.x) +
+                (simPos.y - position.y) * (simPos.y - position.y)
+            );
+
+            if (distToStart < GameConstants::ROCKET_SIZE) {
+                // Add a special marker at intersection point
+                sf::Vertex marker;
+                marker.position = simPos;
+                marker.color = sf::Color::Yellow;
+                trajectoryLine.append(marker);
+                break;
+            }
+        }
+    }
+
+    // Draw the trajectory
+    window.draw(trajectoryLine);
+}

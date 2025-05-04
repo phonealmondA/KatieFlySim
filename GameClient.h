@@ -58,7 +58,8 @@ private:
 public:
     GameClient();
     ~GameClient();
-
+    // Add to GameClient.h in the public section:
+    void initializeLocalSimulation();
     void initialize();
     void update(float deltaTime);
     void processGameState(const GameState& state);

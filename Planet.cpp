@@ -81,65 +81,72 @@ void Planet::setNearbyPlanets(const std::vector<Planet*>& planets) {
     // We don't actually need to store them since drawOrbitPath takes the planets vector directly
     // This is just to maintain API consistency with Rocket class
 }
-
 void Planet::drawOrbitPath(sf::RenderWindow& window, const std::vector<Planet*>& planets,
     float timeStep, int steps)
 {
     // Create a vertex array for the trajectory line
-    sf::VertexArray a(sf::PrimitiveType::LineStrip);
+    sf::VertexArray trajectoryLine(sf::PrimitiveType::LineStrip);
 
     // Start with current position and velocity
-    sf::Vector2f b = position;
-    sf::Vector2f c = velocity;
+    sf::Vector2f simPos = position;
+    sf::Vector2f simVel = velocity;
 
     // Add the starting point
-    sf::Vertex d;
-    d.position = b;
-    d.color = sf::Color(color.r, color.g, color.b, 100); // Semi-transparent version of planet color
-    a.append(d);
+    sf::Vertex startPoint;
+    startPoint.position = simPos;
+    startPoint.color = sf::Color(color.r, color.g, color.b, 100); // Semi-transparent version of planet color
+    trajectoryLine.append(startPoint);
 
     // Simulate future positions
-    for (int e = 0; e < steps; e++) {
+    for (int step = 0; step < steps; step++) {
         // Calculate gravitational forces from all planets
-        sf::Vector2f f(0, 0);
+        sf::Vector2f totalForce(0, 0);
 
-        for (const auto& g : planets) {
+        for (const auto& otherPlanet : planets) {
             // Skip self
-            if (g == this) continue;
+            if (otherPlanet == this) continue;
 
-            sf::Vector2f h = g->getPosition() - b;
-            float i = std::sqrt(h.x * h.x + h.y * h.y);
+            sf::Vector2f direction = otherPlanet->getPosition() - simPos;
+            float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y);
 
             // Skip if too close
-            if (i <= g->getRadius() + c + GameConstants::TRAJECTORY_COLLISION_RADIUS) {
+            if (distance <= otherPlanet->getRadius() + GameConstants::TRAJECTORY_COLLISION_RADIUS) {
                 // Stop the trajectory if we hit another planet
                 break;
             }
 
             // Use same gravitational constant as in GravitySimulator
-            const float j = GameConstants::G;  // Use the constant from the header
-            float k = j * g->getMass() * b / (i * i);
+            const float gravityConstant = GameConstants::G;  // Use the constant from the header
 
-            sf::Vector2f l = normalize(h) * k / b;
-            f += l;
+            // FIX: Use mass() instead of trying to use simPos as mass
+            float force = gravityConstant * otherPlanet->getMass() * this->getMass() / (distance * distance);
+
+            // FIX: Calculate normalized direction vector for force
+            sf::Vector2f normalizedDir = normalize(direction);
+
+            // FIX: Calculate acceleration (force/mass)
+            sf::Vector2f acceleration = normalizedDir * force / this->getMass();
+
+            totalForce += acceleration;
         }
 
         // Update simulated velocity and position
-        c += f * timeStep;
-        b += c * timeStep;
+        simVel += totalForce * timeStep;
+        simPos += simVel * timeStep;
 
         // Calculate fade-out effect
-        float g = 255 * (1.0f - static_cast<float>(e) / steps);
+        float alphaValue = 255 * (1.0f - static_cast<float>(step) / steps);
+
         // Use uint8_t instead of sf::Uint8
-        sf::Color h(color.r, color.g, color.b, static_cast<uint8_t>(g));
+        sf::Color fadeColor(color.r, color.g, color.b, static_cast<uint8_t>(alphaValue));
 
         // Add point to trajectory
-        sf::Vertex i;
-        i.position = b;
-        i.color = h;
-        a.append(i);
+        sf::Vertex trajectoryPoint;
+        trajectoryPoint.position = simPos;
+        trajectoryPoint.color = fadeColor;
+        trajectoryLine.append(trajectoryPoint);
     }
 
     // Draw the trajectory
-    window.draw(a);
+    window.draw(trajectoryLine);
 }

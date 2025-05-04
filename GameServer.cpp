@@ -18,19 +18,17 @@ GameServer::~GameServer() {
         delete a;
     }
     b.clear();
-}
-
-void GameServer::initialize() {
+}void GameServer::initialize() {
     // Create main planet (sun)
-    Planet* a = new Planet(
+    Planet* mainPlanet = new Planet(
         sf::Vector2f(GameConstants::MAIN_PLANET_X, GameConstants::MAIN_PLANET_Y),
         0, GameConstants::MAIN_PLANET_MASS, sf::Color::Yellow);
-    a->setVelocity(sf::Vector2f(1.f, -1.f));
-    b.push_back(a);
+    mainPlanet->setVelocity(sf::Vector2f(1.f, -1.f));
+    b.push_back(mainPlanet);
 
     // Create 9 orbiting planets with different orbital distances, sizes, and colors
-    const float b = GameConstants::SECONDARY_PLANET_MASS;
-    const sf::Color c[] = {
+    const float baseMass = GameConstants::SECONDARY_PLANET_MASS;
+    const sf::Color planetColors[] = {
         sf::Color(150, 150, 150),   // Mercury (gray)
         sf::Color(255, 190, 120),   // Venus (light orange)
         sf::Color(0, 100, 255),     // Earth (blue)
@@ -43,44 +41,44 @@ void GameServer::initialize() {
     };
 
     // Distance and mass scaling factors
-    const float d[] = { 0.4f, 0.7f, 1.0f, 1.5f, 2.2f, 3.0f, 4.0f, 5.0f, 6.0f };
-    const float e[] = { 0.1f, 0.8f, 1.0f, 0.5f, 11.0f, 9.5f, 4.0f, 3.8f, 0.05f };
+    const float distanceFactors[] = { 0.4f, 0.7f, 1.0f, 1.5f, 2.2f, 3.0f, 4.0f, 5.0f, 6.0f };
+    const float massFactors[] = { 0.1f, 0.8f, 1.0f, 0.5f, 11.0f, 9.5f, 4.0f, 3.8f, 0.05f };
 
     // Create each planet
-    for (int f = 0; f < 9; f++) {
-        float g = GameConstants::PLANET_ORBIT_DISTANCE * d[f];
-        float h = (f * 40.0f) * (3.14159f / 180.0f); // Distribute planets around the sun
+    for (int i = 0; i < 9; i++) {
+        float orbitDistance = GameConstants::PLANET_ORBIT_DISTANCE * distanceFactors[i];
+        float angle = (i * 40.0f) * (3.14159f / 180.0f); // Distribute planets around the sun
 
         // Calculate position based on orbit distance and angle
-        float i = a->getPosition().x + g * cos(h);
-        float j = a->getPosition().y + g * sin(h);
+        float posX = mainPlanet->getPosition().x + orbitDistance * cos(angle);
+        float posY = mainPlanet->getPosition().y + orbitDistance * sin(angle);
 
         // Calculate orbital velocity for a circular orbit
-        float k = std::sqrt(GameConstants::G * a->getMass() / g);
+        float orbitalVelocity = std::sqrt(GameConstants::G * mainPlanet->getMass() / orbitDistance);
 
         // Velocity is perpendicular to position vector
-        float l = -sin(h) * k;
-        float m = cos(h) * k;
+        float velX = -sin(angle) * orbitalVelocity;
+        float velY = cos(angle) * orbitalVelocity;
 
         // Create the planet with scaled mass
-        Planet* n = new Planet(
-            sf::Vector2f(i, j),
-            0, b * e[f], c[f]);
+        Planet* newPlanet = new Planet(
+            sf::Vector2f(posX, posY),
+            0, baseMass * massFactors[i], planetColors[i]);
 
-        n->setVelocity(sf::Vector2f(l, m));
-        b.push_back(n);
+        newPlanet->setVelocity(sf::Vector2f(velX, velY));
+        b.push_back(newPlanet);
     }
 
     // Setup gravity simulator
-    a.setSimulatePlanetGravity(true);
-    for (auto a : b) {
-        this->a.addPlanet(a);
+    this->a.setSimulatePlanetGravity(true);
+    for (auto planet : b) {
+        this->a.addPlanet(planet);
     }
 
     // Create a default host player (ID 0)
-    sf::Vector2f a = b[0]->getPosition() +
+    sf::Vector2f spawnPos = b[0]->getPosition() +
         sf::Vector2f(0, -(b[0]->getRadius() + GameConstants::ROCKET_SIZE));
-    addPlayer(0, a, sf::Color::White);
+    addPlayer(0, spawnPos, sf::Color::White);
 }
 
 int GameServer::addPlayer(int playerId, sf::Vector2f initialPos, sf::Color color) {

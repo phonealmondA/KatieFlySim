@@ -117,7 +117,7 @@ void VehicleManager::update(float deltaTime) {
     }
     catch (const std::exception& a) {
         std::cerr << "Exception creating validPlanets: " << a.what() << std::endl;
-        a.clear();
+        
     }
 
     if (a.empty()) {
